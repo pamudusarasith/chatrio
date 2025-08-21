@@ -1,3 +1,4 @@
+import 'package:chatrio/chat_list.dart';
 import 'package:flutter/material.dart';
 
 import 'share_qr_page.dart';
@@ -88,10 +89,16 @@ class HomeScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 16),
                     ),
                     onPressed: () {
-                      // Navigate to Chat List
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChatsPage(),
+                        ),
+                      );
                     },
                   ),
                 ),
+
                 const SizedBox(height: 15),
                 // Start New Chat (QR) Button as clickable text
                 MouseRegion(
