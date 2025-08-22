@@ -57,13 +57,13 @@ class _ScanQRPageState extends State<ScanQRPage> {
                 borderRadius: BorderRadius.circular(24),
                 // color: Colors.black,
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.qr_code_scanner,
-                  color: Colors.cyan,
-                  size: 60,
-                ),
-              ),
+              // child: const Center(
+              //   child: Icon(
+              //     Icons.qr_code_scanner,
+              //     color: Colors.cyan,
+              //     size: 60,
+              //   ),
+              // ),
             ),
           ),
           // Instructions and button
