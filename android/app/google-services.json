@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "939007904042",
+    "firebase_url": "https://chatrio-708e2-default-rtdb.firebaseio.com",
+    "project_id": "chatrio-708e2",
+    "storage_bucket": "chatrio-708e2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:939007904042:android:5d03a9b29cb104497d3653",
+        "android_client_info": {
+          "package_name": "com.example.chatrio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBD5UTCmPd-JQ5M8WYQkB1_J0En66jWJZs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
