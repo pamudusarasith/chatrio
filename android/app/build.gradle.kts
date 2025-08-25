@@ -24,10 +24,10 @@ android {
         applicationId = "com.example.chatrio"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdkVersion = 21
-        targetSdkVersion = 33
-        versionCode = 1
-        versionName = "1.0"
+        minSdkVersion = flutter.minSdkVersion
+        targetSdkVersion = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     buildTypes {
