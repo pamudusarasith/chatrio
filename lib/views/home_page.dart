@@ -80,7 +80,7 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 icon: const Icon(Icons.chat_bubble_outline),
-                label: Text("My Chats"),
+                label: const Text("My Chats"),
                 onPressed: () {
                   context.navigate("/chats");
                 },
