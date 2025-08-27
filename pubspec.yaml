@@ -1,17 +1,19 @@
 name: chatrio
 description: "A new Flutter project."
-publish_to: "none"
+publish_to: 'none'
 version: 0.1.0
 
 environment:
   sdk: ^3.9.0
 
 dependencies:
-  flutter:
-    sdk: flutter
+  firebase_auth: ^6.0.1
   firebase_core: ^4.0.0
   firebase_database: ^12.0.0
-  mobile_scanner: ^7.0.1
+  flutter:
+    sdk: flutter
+  go_router: ^16.2.0
+  provider: ^6.1.5+1
 
 dev_dependencies:
   flutter_test:
@@ -20,7 +22,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # Add assets here
   assets:
     - assets/
