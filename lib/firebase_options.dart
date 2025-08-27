@@ -23,11 +23,20 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.macOS:
-        return macos;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for macos - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -59,36 +68,4 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://chatrio-708e2-default-rtdb.firebaseio.com',
     storageBucket: 'chatrio-708e2.firebasestorage.app',
   );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDpdz9TDIi_vPh_SImF4Gu2gte7e13HyO4',
-    appId: '1:939007904042:ios:2c903187c7f3da0a7d3653',
-    messagingSenderId: '939007904042',
-    projectId: 'chatrio-708e2',
-    databaseURL: 'https://chatrio-708e2-default-rtdb.firebaseio.com',
-    storageBucket: 'chatrio-708e2.firebasestorage.app',
-    iosBundleId: 'com.example.chatrio',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDpdz9TDIi_vPh_SImF4Gu2gte7e13HyO4',
-    appId: '1:939007904042:ios:2c903187c7f3da0a7d3653',
-    messagingSenderId: '939007904042',
-    projectId: 'chatrio-708e2',
-    databaseURL: 'https://chatrio-708e2-default-rtdb.firebaseio.com',
-    storageBucket: 'chatrio-708e2.firebasestorage.app',
-    iosBundleId: 'com.example.chatrio',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBSPzFjTI0hdTsCJ938dSXaNdANTsR8oFU',
-    appId: '1:939007904042:web:6017bc0dc25b66907d3653',
-    messagingSenderId: '939007904042',
-    projectId: 'chatrio-708e2',
-    authDomain: 'chatrio-708e2.firebaseapp.com',
-    databaseURL: 'https://chatrio-708e2-default-rtdb.firebaseio.com',
-    storageBucket: 'chatrio-708e2.firebasestorage.app',
-    measurementId: 'G-FCBZX7M6LE',
-  );
-
 }

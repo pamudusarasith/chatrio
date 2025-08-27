@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'theme.dart';
-import 'home_screen.dart';
+import 'router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,10 +14,17 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: "Chatrio",
-      home: const HomeScreen(),
-      theme: getAppTheme(context),
+      routerConfig: router,
+      theme: ThemeData.from(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color.fromARGB(255, 25, 200, 200),
+          primary: const Color.fromARGB(255, 25, 200, 200),
+          // brightness: MediaQuery.platformBrightnessOf(context),
+          brightness: Brightness.light,
+        ),
+      ),
     );
   }
 }
