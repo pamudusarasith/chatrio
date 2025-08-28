@@ -28,13 +28,13 @@ class GenerateQRPage extends StatelessWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text("New QR code generated"),
+                              content: Text("New session generated"),
                             ),
                           );
                         }
                       },
                 icon: const Icon(Icons.refresh),
-                tooltip: 'Generate New QR Code',
+                tooltip: 'Generate New Session',
               );
             },
           ),
@@ -94,7 +94,9 @@ class GenerateQRPage extends StatelessWidget {
                 );
               }
 
-              if (!viewModel.isQRGenerated || viewModel.currentUserId == null) {
+              if (!viewModel.isQRGenerated ||
+                  viewModel.currentUserId == null ||
+                  viewModel.currentSessionId == null) {
                 return const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [Text('No QR Code generated')],
@@ -131,7 +133,7 @@ class GenerateQRPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: QrImageView(
-                          data: viewModel.currentUserId!,
+                          data: viewModel.qrCodeData,
                           version: QrVersions.auto,
                           size: 200.0,
                           backgroundColor: Colors.white,
@@ -153,46 +155,24 @@ class GenerateQRPage extends StatelessWidget {
                     "Ask your friend to scan this QR code",
                     style: TextStyle(color: Colors.black54),
                   ),
-                  const SizedBox(height: 16),
-
-                  // User ID display
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Text(
-                      'ID: ${viewModel.currentUserId!.substring(0, 8)}...',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
 
                   const SizedBox(height: 30),
 
-                  // Copy Code Button
+                  // Regenerate Session Button
                   ElevatedButton.icon(
                     onPressed: () async {
-                      await viewModel.copyToClipboard();
+                      await viewModel.regenerateSessionId();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text("User ID copied to clipboard"),
+                            content: Text("New session generated"),
                           ),
                         );
                       }
                     },
-                    icon: const Icon(Icons.copy, color: Colors.white),
+                    icon: const Icon(Icons.refresh, color: Colors.white),
                     label: const Text(
-                      "Copy User ID",
+                      "New Session",
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -202,7 +182,7 @@ class GenerateQRPage extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF19c8d1),
                       padding: const EdgeInsets.symmetric(
-                        vertical: 24,
+                        vertical: 12,
                         horizontal: 34,
                       ),
                       shape: RoundedRectangleBorder(
