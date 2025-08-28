@@ -144,51 +144,6 @@ class HomePage extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 10, color: Colors.grey[600]),
               ),
-
-              const SizedBox(height: 20),
-
-              // Authentication links
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () {
-                        context.navigate("/sign-in");
-                      },
-                      child: Text(
-                        "Sign In",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Text(
-                    " • ",
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                  MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () {
-                        context.navigate("/create-account");
-                      },
-                      child: Text(
-                        "Create Account",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
