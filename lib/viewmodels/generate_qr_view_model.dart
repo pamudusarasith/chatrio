@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../models/user.dart';
 import '../repositories/user_repository.dart';
@@ -11,6 +11,7 @@ class GenerateQRViewModel extends ChangeNotifier {
   // State variables
   bool _isLoading = false;
   String? _currentUserId;
+  String? _currentSessionId;
   String? _errorMessage;
   bool _isQRGenerated = false;
 
@@ -22,8 +23,19 @@ class GenerateQRViewModel extends ChangeNotifier {
   // Getters
   bool get isLoading => _isLoading;
   String? get currentUserId => _currentUserId;
+  String? get currentSessionId => _currentSessionId;
   String? get errorMessage => _errorMessage;
   bool get isQRGenerated => _isQRGenerated;
+
+  String get qrCodeData {
+    if (_currentUserId == null || _currentSessionId == null) {
+      return '';
+    }
+    return jsonEncode({
+      'userId': _currentUserId,
+      'sessionId': _currentSessionId,
+    });
+  }
 
   Future<void> _initializeUser() async {
     _setLoading(true);
@@ -33,10 +45,17 @@ class GenerateQRViewModel extends ChangeNotifier {
 
       if (existingUser != null) {
         _currentUserId = existingUser.id;
-        _isQRGenerated = true;
       } else {
-        await _generateNewUser();
+        // Generate new persistent user ID
+        _currentUserId = _uuid.v4();
+        final user = User(id: _currentUserId!, createdAt: DateTime.now());
+        await _userRepository.saveUser(user);
       }
+
+      // Always generate a new session ID on initialization
+      _generateNewSessionId();
+      _isQRGenerated = true;
+      _clearError();
     } catch (e) {
       _setError('Failed to initialize user: $e');
     } finally {
@@ -44,26 +63,16 @@ class GenerateQRViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _generateNewUser() async {
-    try {
-      _currentUserId = _uuid.v4();
-      final user = User(id: _currentUserId!, createdAt: DateTime.now());
-      await _userRepository.saveUser(user);
-      _isQRGenerated = true;
-      _clearError();
-    } catch (e) {
-      _setError('Failed to generate user ID: $e');
-    }
+  void _generateNewSessionId() {
+    _currentSessionId = _uuid.v4();
+    notifyListeners();
   }
 
   Future<void> generateNewQRCode() async {
     _setLoading(true);
     try {
-      // Clear existing user and generate new one
-      if (_currentUserId != null) {
-        await _userRepository.deleteUser(_currentUserId!);
-      }
-      await _generateNewUser();
+      // Only regenerate session ID, keep user ID persistent
+      _generateNewSessionId();
     } catch (e) {
       _setError('Failed to generate new QR code: $e');
     } finally {
@@ -71,13 +80,15 @@ class GenerateQRViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> copyToClipboard() async {
-    if (_currentUserId != null) {
-      try {
-        await Clipboard.setData(ClipboardData(text: _currentUserId!));
-      } catch (e) {
-        _setError('Failed to copy to clipboard: $e');
-      }
+  Future<void> regenerateSessionId() async {
+    _setLoading(true);
+    try {
+      _generateNewSessionId();
+      _clearError();
+    } catch (e) {
+      _setError('Failed to regenerate session ID: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
