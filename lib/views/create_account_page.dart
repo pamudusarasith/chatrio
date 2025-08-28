@@ -3,12 +3,13 @@ import '../viewmodels/create_account_view_model.dart';
 import '../router.dart';
 
 class CreateAccountPage extends StatelessWidget {
-  const CreateAccountPage({super.key});
+  const CreateAccountPage({super.key, required this.viewModel});
+
+  final CreateAccountViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CreateAccountViewModel viewModel = CreateAccountViewModel();
 
     return Scaffold(
       appBar: AppBar(

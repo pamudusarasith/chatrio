@@ -3,12 +3,13 @@ import '../viewmodels/sign_in_view_model.dart';
 import '../router.dart';
 
 class SignInPage extends StatelessWidget {
-  const SignInPage({super.key});
+  const SignInPage({super.key, required this.viewModel});
+
+  final SignInViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final SignInViewModel viewModel = SignInViewModel();
 
     return Scaffold(
       appBar: AppBar(
