@@ -54,7 +54,7 @@ class ScanQrPage extends StatelessWidget {
 
           // Show success state when session is activated
           if (!viewModel.isWaitingForActivation &&
-              viewModel.sessionId != null &&
+              viewModel.chatId != null &&
               !viewModel.isLoading &&
               !viewModel.isCreating) {
             return const SuccessViewWidget();
@@ -118,7 +118,7 @@ class ScanQrPage extends StatelessWidget {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Text(

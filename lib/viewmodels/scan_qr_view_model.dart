@@ -5,12 +5,13 @@ import '../models/user.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../services/qr_service.dart';
+import '../utils/logger.dart';
 
 class ScanQRViewModel extends ChangeNotifier {
   final UserService _userService = UserService();
   late MobileScannerController _scannerController;
   late ChatService _chatService;
-  StreamSubscription? _sessionSubscription;
+  StreamSubscription? _chatSubscription;
 
   // State variables
   bool _isLoading = false;
@@ -19,7 +20,7 @@ class ScanQRViewModel extends ChangeNotifier {
   String? _currentUserId;
   String? _errorMessage;
   Map<String, dynamic>? _parsedQRData;
-  String? _sessionId;
+  String? _chatId;
   bool _isValidQR = false;
 
   ScanQRViewModel() {
@@ -33,7 +34,7 @@ class ScanQRViewModel extends ChangeNotifier {
   String? get currentUserId => _currentUserId;
   String? get errorMessage => _errorMessage;
   Map<String, dynamic>? get parsedQRData => _parsedQRData;
-  String? get sessionId => _sessionId;
+  String? get chatId => _chatId;
   bool get isValidQR => _isValidQR;
   String? get creatorId => _parsedQRData?['creator_id'];
   MobileScannerController get scannerController => _scannerController;
@@ -81,12 +82,12 @@ class ScanQRViewModel extends ChangeNotifier {
   }
 
   void _handleScannedData(String data) {
-    // Log to console as requested
-    print('QR Code Scanned: $data');
+    // Log scanned QR code data
+    AppLogger.debug('QR Code Scanned: $data');
 
     // Reset validation state
     _isValidQR = false;
-    _sessionId = null;
+    _chatId = null;
     _parsedQRData = null;
 
     // Check if it's a Chatrio QR code using QR service
@@ -95,45 +96,45 @@ class ScanQRViewModel extends ChangeNotifier {
       _parsedQRData = QRService.parseQRData(data);
 
       if (_parsedQRData != null) {
-        print('Parsed QR Data: $_parsedQRData');
+        AppLogger.debug('Parsed QR Data: $_parsedQRData');
 
         // Validate the QR data using QR service
-        if (QRService.isValidSessionQR(_parsedQRData!)) {
+        if (QRService.isValidChatQR(_parsedQRData!)) {
           _isValidQR = true;
-          _sessionId = QRService.getSessionIdFromQR(data);
+          _chatId = QRService.getChatIdFromQR(data);
 
-          print('Valid Chatrio QR detected!');
-          print('Session ID: $_sessionId');
-          print('Creator ID: ${_parsedQRData!['creator_id']}');
-          print('Timestamp: ${_parsedQRData!['timestamp']}');
+          AppLogger.info('Valid Chatrio QR detected!');
+          AppLogger.debug('Chat ID: $_chatId');
+          AppLogger.debug('Creator ID: ${_parsedQRData!['creator_id']}');
+          AppLogger.debug('Timestamp: ${_parsedQRData!['timestamp']}');
 
           if (_parsedQRData!['expires_at'] != null) {
-            print('Expires at: ${_parsedQRData!['expires_at']}');
+            AppLogger.debug('Expires at: ${_parsedQRData!['expires_at']}');
           }
 
           _clearError();
 
-          // Automatically create the session
-          _createSession();
+          // Automatically create the chat
+          _createChat();
         } else {
-          print('Invalid or expired Chatrio QR code');
+          AppLogger.warning('Invalid or expired Chatrio QR code');
           _setError('Invalid or expired QR code');
         }
       } else {
-        print('Failed to parse Chatrio QR code');
+        AppLogger.warning('Failed to parse Chatrio QR code');
         _setError('Invalid QR code format');
       }
     } else {
-      print('Not a Chatrio QR code: $data');
+      AppLogger.info('Not a Chatrio QR code: $data');
       _setError('This is not a valid Chatrio QR code');
     }
 
     notifyListeners();
   }
 
-  // Create session (called automatically when valid QR is scanned)
-  Future<void> _createSession() async {
-    if (!_isValidQR || _sessionId == null || _parsedQRData == null) {
+  // Create chat (called automatically when valid QR is scanned)
+  Future<void> _createChat() async {
+    if (!_isValidQR || _chatId == null || _parsedQRData == null) {
       return;
     }
 
@@ -141,65 +142,65 @@ class ScanQRViewModel extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      print('Automatically creating session...');
+      AppLogger.info('Automatically creating chat...');
 
-      // Use chat service to create the session
-      bool success = await _chatService.createSession(
-        sessionId: _sessionId!,
+      // Use chat service to create the chat
+      bool success = await _chatService.createChat(
+        chatId: _chatId!,
         creatorId: _parsedQRData!['creator_id'],
         createdAt: _parsedQRData!['created_at'],
         expiresAt: _parsedQRData!['expires_at'],
       );
 
       if (success) {
-        print('Successfully created session: $_sessionId');
+        AppLogger.info('Successfully created chat: $_chatId');
         _clearError();
 
-        // Now wait for the session to be activated by the generator
-        _waitForSessionActivation();
+        // Now wait for the chat to be activated by the generator
+        _waitForChatActivation();
       } else {
-        print('Failed to create session');
-        _setError('Failed to create session.');
+        AppLogger.error('Failed to create chat');
+        _setError('Failed to create chat.');
       }
     } catch (e) {
-      print('Error joining session: $e');
-      _setError('Error joining session: $e');
+      AppLogger.error('Error joining chat', e);
+      _setError('Error joining chat: $e');
     } finally {
       _isCreating = false;
       _setLoading(false);
     }
   }
 
-  // Wait for the session to be activated by the generator
-  void _waitForSessionActivation() {
-    if (_sessionId == null) return;
+  // Wait for the chat to be activated by the generator
+  void _waitForChatActivation() {
+    if (_chatId == null) return;
 
     _isWaitingForActivation = true;
     _isCreating = false;
     notifyListeners();
 
-    print('Waiting for generator to activate session...');
+    AppLogger.info('Waiting for generator to activate chat...');
 
-    _sessionSubscription = _chatService.listenToSessionChanges(_sessionId!, (
+    _chatSubscription = _chatService.listenToChatChanges(_chatId!, (
       joinedUserId,
       isActive,
     ) {
       if (isActive) {
-        print('Session activated! Both users confirmed.');
+        AppLogger.info('Chat activated! Both users confirmed.');
         _isWaitingForActivation = false;
         _setLoading(false);
         _clearError();
 
-        // Session is now active and saved locally by ChatService
+        // Chat is now active and saved locally by ChatService
         _stopListening();
       }
     });
   }
 
-  // Stop listening to session changes
+  // Stop listening to chat changes
   void _stopListening() {
-    _sessionSubscription?.cancel();
-    _sessionSubscription = null;
+    _chatSubscription?.cancel();
+    _chatSubscription = null;
   }
 
   void _setLoading(bool loading) {
