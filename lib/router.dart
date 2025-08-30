@@ -4,29 +4,34 @@ import 'package:go_router/go_router.dart';
 import 'views/home_page.dart';
 import 'views/generate_qr_page.dart';
 import 'views/scan_qr_page.dart';
-import 'views/create_account_page.dart';
-import 'views/sign_in_page.dart';
+import 'viewmodels/home_view_model.dart';
+import 'viewmodels/generate_qr_view_model.dart';
+import 'viewmodels/scan_qr_view_model.dart';
 
 GoRouter get router {
   return GoRouter(
     debugLogDiagnostics: true,
     routes: [
-      GoRoute(path: '/', builder: (context, state) => const HomePage()),
+      GoRoute(
+        path: '/',
+        builder: (context, state) {
+          final homeViewModel = HomeViewModel();
+          return HomePage(viewModel: homeViewModel);
+        },
+      ),
       GoRoute(
         path: '/generate-qr',
-        builder: (context, state) => const GenerateQRPage(),
+        builder: (context, state) {
+          final generateQRViewModel = GenerateQRViewModel();
+          return GenerateQRPage(viewModel: generateQRViewModel);
+        },
       ),
       GoRoute(
         path: '/scan-qr',
-        builder: (context, state) => const ScanQrPage(),
-      ),
-      GoRoute(
-        path: '/create-account',
-        builder: (context, state) => const CreateAccountPage(),
-      ),
-      GoRoute(
-        path: '/sign-in',
-        builder: (context, state) => const SignInPage(),
+        builder: (context, state) {
+          final scanQRViewModel = ScanQRViewModel();
+          return ScanQrPage(viewModel: scanQRViewModel);
+        },
       ),
     ],
   );
