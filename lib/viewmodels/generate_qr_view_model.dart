@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../services/user_service.dart';
 import '../services/qr_service.dart';
 import '../services/chat_service.dart';
+import '../utils/logger.dart';
 
 class GenerateQRViewModel extends ChangeNotifier {
   final UserService _userService = UserService();
@@ -14,14 +15,14 @@ class GenerateQRViewModel extends ChangeNotifier {
   // State variables
   bool _isLoading = false;
   String? _currentUserId;
-  String? _currentSessionId;
+  String? _currentChatId;
   String? _errorMessage;
   bool _isQRGenerated = false;
-  bool _isSessionActive = false;
+  bool _isChatActive = false;
   String? _joinedUserId;
 
-  // Stream subscription for session changes
-  StreamSubscription? _sessionSubscription;
+  // Stream subscription for chat changes
+  StreamSubscription? _chatSubscription;
 
   GenerateQRViewModel() {
     _initializeUser();
@@ -30,18 +31,18 @@ class GenerateQRViewModel extends ChangeNotifier {
   // Getters
   bool get isLoading => _isLoading;
   String? get currentUserId => _currentUserId;
-  String? get currentSessionId => _currentSessionId;
+  String? get currentChatId => _currentChatId;
   String? get errorMessage => _errorMessage;
   bool get isQRGenerated => _isQRGenerated;
-  bool get isSessionActive => _isSessionActive;
+  bool get isChatActive => _isChatActive;
   String? get joinedUserId => _joinedUserId;
 
   String get qrCodeData {
-    if (_currentUserId == null || _currentSessionId == null) {
+    if (_currentUserId == null || _currentChatId == null) {
       return '';
     }
     // Use QR service to generate properly formatted QR data
-    return QRService.generateSessionQR(_currentSessionId!, _currentUserId!);
+    return QRService.generateChatQR(_currentChatId!, _currentUserId!);
   }
 
   Future<void> _initializeUser() async {
@@ -53,8 +54,8 @@ class GenerateQRViewModel extends ChangeNotifier {
       // Initialize chat service
       _chatService = ChatService(userId: _currentUserId!);
 
-      // Always generate a new session ID on initialization
-      _generateNewSessionId();
+      // Always generate a new chat ID on initialization
+      _generateNewChatId();
       _isQRGenerated = true;
       _clearError();
     } catch (e) {
@@ -64,23 +65,23 @@ class GenerateQRViewModel extends ChangeNotifier {
     }
   }
 
-  void _generateNewSessionId() {
+  void _generateNewChatId() {
     if (_currentUserId == null) {
       _setError('User initialization failed. Restart the app.');
       return;
     }
 
-    // Stop listening to previous session if any
-    _stopSessionListening();
+    // Stop listening to previous chat if any
+    _stopChatListening();
 
-    // Reset session state
-    _isSessionActive = false;
+    // Reset chat state
+    _isChatActive = false;
     _joinedUserId = null;
 
-    _currentSessionId = _uuid.v4();
+    _currentChatId = _uuid.v4();
 
-    // Start listening for when someone joins this session
-    _startSessionListening();
+    // Start listening for when someone joins this chat
+    _startChatListening();
 
     notifyListeners();
   }
@@ -88,8 +89,8 @@ class GenerateQRViewModel extends ChangeNotifier {
   Future<void> generateNewQRCode() async {
     _setLoading(true);
     try {
-      // Only regenerate session ID, keep user ID persistent
-      _generateNewSessionId();
+      // Only regenerate chat ID, keep user ID persistent
+      _generateNewChatId();
     } catch (e) {
       _setError('Failed to generate new QR code: $e');
     } finally {
@@ -97,13 +98,13 @@ class GenerateQRViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> regenerateSessionId() async {
+  Future<void> regenerateChatId() async {
     _setLoading(true);
     try {
-      _generateNewSessionId();
+      _generateNewChatId();
       _clearError();
     } catch (e) {
-      _setError('Failed to regenerate session ID: $e');
+      _setError('Failed to regenerate chat ID: $e');
     } finally {
       _setLoading(false);
     }
@@ -127,32 +128,32 @@ class GenerateQRViewModel extends ChangeNotifier {
   // Public method for UI to clear errors
   void clearError() => _clearError();
 
-  // Session listening methods
-  void _startSessionListening() {
-    if (_currentSessionId == null || _chatService == null) return;
+  // Chat listening methods
+  void _startChatListening() {
+    if (_currentChatId == null || _chatService == null) return;
 
-    _sessionSubscription = _chatService!.listenToSessionChanges(
-      _currentSessionId!,
-      (joinedUserId, isActive) {
-        if (joinedUserId != null && joinedUserId.isNotEmpty) {
-          // Someone joined the session!
-          _isSessionActive = true;
-          _joinedUserId = joinedUserId;
-          print('User $joinedUserId joined session $_currentSessionId');
-          notifyListeners();
-        }
-      },
-    );
+    _chatSubscription = _chatService!.listenToChatChanges(_currentChatId!, (
+      joinedUserId,
+      isActive,
+    ) {
+      if (joinedUserId != null && joinedUserId.isNotEmpty) {
+        // Someone joined the chat!
+        _isChatActive = true;
+        _joinedUserId = joinedUserId;
+        AppLogger.info('User $joinedUserId joined chat $_currentChatId');
+        notifyListeners();
+      }
+    });
   }
 
-  void _stopSessionListening() {
-    _sessionSubscription?.cancel();
-    _sessionSubscription = null;
+  void _stopChatListening() {
+    _chatSubscription?.cancel();
+    _chatSubscription = null;
   }
 
   @override
   void dispose() {
-    _stopSessionListening();
+    _stopChatListening();
     super.dispose();
   }
 }

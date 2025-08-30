@@ -1,5 +1,5 @@
-class ChatSession {
-  final String sessionId;
+class Chat {
+  final String chatId;
   final String creator;
   final String joiner;
   final int createdAt;
@@ -7,8 +7,8 @@ class ChatSession {
   final bool isActive;
   final String? nickname;
 
-  ChatSession({
-    required this.sessionId,
+  Chat({
+    required this.chatId,
     required this.creator,
     required this.joiner,
     required this.createdAt,
@@ -17,9 +17,9 @@ class ChatSession {
     this.nickname,
   });
 
-  factory ChatSession.fromJson(String sessionId, Map<String, dynamic> json) {
-    return ChatSession(
-      sessionId: sessionId,
+  factory Chat.fromJson(String chatId, Map<String, dynamic> json) {
+    return Chat(
+      chatId: chatId,
       creator: json['creator'] ?? '',
       joiner: json['joiner'] ?? '',
       createdAt: json['created_at'] ?? 0,
@@ -41,7 +41,7 @@ class ChatSession {
 
   Map<String, dynamic> toMap() {
     return {
-      'session_id': sessionId,
+      'chat_id': chatId,
       'creator': creator,
       'joiner': joiner,
       'created_at': createdAt,
@@ -51,9 +51,9 @@ class ChatSession {
     };
   }
 
-  factory ChatSession.fromMap(Map<String, dynamic> map) {
-    return ChatSession(
-      sessionId: map['session_id'] as String,
+  factory Chat.fromMap(Map<String, dynamic> map) {
+    return Chat(
+      chatId: map['chat_id'] as String,
       creator: map['creator'] as String,
       joiner: map['joiner'] as String,
       createdAt: map['created_at'] as int,
@@ -92,8 +92,8 @@ class ChatSession {
   }
 
   // Create a copy with updated fields
-  ChatSession copyWith({
-    String? sessionId,
+  Chat copyWith({
+    String? chatId,
     String? creator,
     String? joiner,
     int? createdAt,
@@ -101,8 +101,8 @@ class ChatSession {
     bool? isActive,
     String? nickname,
   }) {
-    return ChatSession(
-      sessionId: sessionId ?? this.sessionId,
+    return Chat(
+      chatId: chatId ?? this.chatId,
       creator: creator ?? this.creator,
       joiner: joiner ?? this.joiner,
       createdAt: createdAt ?? this.createdAt,
@@ -114,6 +114,6 @@ class ChatSession {
 
   @override
   String toString() {
-    return 'ChatSession(sessionId: $sessionId, creator: $creator, joiner: $joiner, createdAt: $createdAt, expiresAt: $expiresAt, isActive: $isActive, nickname: $nickname)';
+    return 'Chat(chatId: $chatId, creator: $creator, joiner: $joiner, createdAt: $createdAt, expiresAt: $expiresAt, isActive: $isActive, nickname: $nickname)';
   }
 }

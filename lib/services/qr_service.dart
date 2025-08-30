@@ -1,14 +1,15 @@
 import 'dart:convert';
+import '../utils/logger.dart';
 
 class QRService {
   static const String _qrPrefix = 'chatrio://';
 
-  // Generate QR data for a chat session
-  static String generateSessionQR(String sessionId, String creatorId) {
+  // Generate QR data for a chat
+  static String generateChatQR(String chatId, String creatorId) {
     Map<String, dynamic> qrData = {
-      'type': 'chat_session',
+      'type': 'create_chat',
       'creator_id': creatorId,
-      'session_id': sessionId,
+      'chat_id': chatId,
       'created_at': DateTime.now().millisecondsSinceEpoch,
       'expires_at': DateTime.now()
           .add(Duration(minutes: 10))
@@ -34,18 +35,18 @@ class QRService {
 
       return parsedData;
     } catch (e) {
-      print('Error parsing QR data: $e');
+      AppLogger.error('Error parsing QR data', e);
       return null;
     }
   }
 
-  // Validate QR data for chat session
-  static bool isValidSessionQR(Map<String, dynamic> qrData) {
-    if (qrData['type'] != 'chat_session') return false;
+  // Validate QR data for chat
+  static bool isValidChatQR(Map<String, dynamic> qrData) {
+    if (qrData['type'] != 'create_chat') return false;
     if (qrData['creator_id'] == null || qrData['creator_id'].isEmpty) {
       return false;
     }
-    if (qrData['session_id'] == null || qrData['session_id'].isEmpty) {
+    if (qrData['chat_id'] == null || qrData['chat_id'].isEmpty) {
       return false;
     }
 
@@ -60,14 +61,14 @@ class QRService {
     return true;
   }
 
-  // Extract session ID from QR data
-  static String? getSessionIdFromQR(String qrData) {
+  // Extract chat ID from QR data
+  static String? getChatIdFromQR(String qrData) {
     Map<String, dynamic>? parsedData = parseQRData(qrData);
-    if (parsedData == null || !isValidSessionQR(parsedData)) {
+    if (parsedData == null || !isValidChatQR(parsedData)) {
       return null;
     }
 
-    return parsedData['session_id'] as String?;
+    return parsedData['chat_id'] as String?;
   }
 
   // Check if QR code is for this app

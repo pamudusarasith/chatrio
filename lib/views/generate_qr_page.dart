@@ -64,7 +64,7 @@ class GenerateQRPage extends StatelessWidget {
               }
 
               // Show success state when session is activated
-              if (viewModel.isSessionActive && viewModel.joinedUserId != null) {
+              if (viewModel.isChatActive && viewModel.joinedUserId != null) {
                 return const SuccessViewWidget(
                   title: 'Someone Connected!',
                   subtitle: 'Your chat session is now active',
@@ -74,7 +74,7 @@ class GenerateQRPage extends StatelessWidget {
 
               if (!viewModel.isQRGenerated ||
                   viewModel.currentUserId == null ||
-                  viewModel.currentSessionId == null) {
+                  viewModel.currentChatId == null) {
                 return const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [Text('No QR Code generated')],
@@ -139,7 +139,7 @@ class GenerateQRPage extends StatelessWidget {
                   // Regenerate Session Button
                   ElevatedButton.icon(
                     onPressed: () async {
-                      await viewModel.regenerateSessionId();
+                      await viewModel.regenerateChatId();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(

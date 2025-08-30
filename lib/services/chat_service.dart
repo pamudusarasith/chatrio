@@ -1,24 +1,25 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
-import '../models/chat_message.dart';
-import '../models/chat_session.dart';
+import '../models/message.dart';
+import '../models/chat.dart';
 import '../models/extension_request.dart';
-import '../repositories/session_repository.dart';
+import '../repositories/chat_repository.dart';
 import '../repositories/message_repository.dart';
+import '../utils/logger.dart';
 
 class ChatService {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
-  final SessionRepository _sessionRepository = SessionRepository();
+  final ChatRepository _chatRepository = ChatRepository();
   final MessageRepository _messageRepository = MessageRepository();
   final String userId;
 
   StreamSubscription<DatabaseEvent>? _messageSubscription;
-  StreamSubscription<DatabaseEvent>? _sessionSubscription;
+  StreamSubscription<DatabaseEvent>? _chatSubscription;
 
-  final StreamController<ChatMessage> _messageController =
-      StreamController<ChatMessage>.broadcast();
-  final StreamController<List<ChatSession>> _sessionController =
-      StreamController<List<ChatSession>>.broadcast();
+  final StreamController<Message> _messageController =
+      StreamController<Message>.broadcast();
+  final StreamController<List<Chat>> _chatController =
+      StreamController<List<Chat>>.broadcast();
   final StreamController<List<ExtensionRequest>> _extensionRequestController =
       StreamController<List<ExtensionRequest>>.broadcast();
 
@@ -27,8 +28,8 @@ class ChatService {
   }
 
   // Streams
-  Stream<ChatMessage> get incomingMessages => _messageController.stream;
-  Stream<List<ChatSession>> get activeSessions => _sessionController.stream;
+  Stream<Message> get incomingMessages => _messageController.stream;
+  Stream<List<Chat>> get activeChats => _chatController.stream;
   Stream<List<ExtensionRequest>> get extensionRequests =>
       _extensionRequestController.stream;
 
@@ -45,7 +46,7 @@ class ChatService {
         .onChildAdded
         .listen((event) async {
           try {
-            ChatMessage message = ChatMessage.fromJson(
+            Message message = Message.fromJson(
               event.snapshot.key!,
               Map<String, dynamic>.from(event.snapshot.value as Map),
             );
@@ -59,7 +60,7 @@ class ChatService {
             // Auto-delete message from Firebase after receiving
             await _deleteFirebaseMessage(message.messageId);
           } catch (e) {
-            print('Error processing incoming message: $e');
+            AppLogger.error('Error processing incoming message', e);
           }
         });
   }
@@ -71,46 +72,44 @@ class ChatService {
     });
   }
 
-  // Send message (only if session is valid)
+  // Send message (only if chat is valid)
   Future<bool> sendMessage(
-    String sessionId,
+    String chatId,
     String recipientId,
     String text,
   ) async {
     try {
-      // Check if session is still valid in local database
-      ChatSession? session = await _sessionRepository.getSession(sessionId);
-      if (session != null && !session.isValid()) {
+      // Check if chat is still valid in local database
+      Chat? chat = await _chatRepository.getChat(chatId);
+      if (chat != null && !chat.isValid()) {
         return false;
       }
 
-      // Check session validity in Firebase
-      DataSnapshot sessionSnapshot = await _database
-          .child('sessions/$sessionId')
-          .get();
+      // Check chat validity in Firebase
+      DataSnapshot chatSnapshot = await _database.child('chats/$chatId').get();
 
-      if (!sessionSnapshot.exists) return false;
+      if (!chatSnapshot.exists) return false;
 
-      ChatSession firebaseSession = ChatSession.fromJson(
-        sessionId,
-        Map<String, dynamic>.from(sessionSnapshot.value as Map),
+      Chat firebaseChat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!firebaseSession.isValid()) {
-        await _expireSession(sessionId);
+      if (!firebaseChat.isValid()) {
+        await _expireChat(chatId);
         return false;
       }
 
       // Generate message ID and create message
       String messageId = _database.child('messages/$recipientId').push().key!;
 
-      ChatMessage message = ChatMessage(
+      Message message = Message(
         messageId: messageId,
         sender: userId,
         recipient: recipientId,
         text: text,
         timestamp: DateTime.now().millisecondsSinceEpoch,
-        sessionId: sessionId,
+        chatId: chatId,
       );
 
       // Send to Firebase
@@ -123,32 +122,30 @@ class ChatService {
 
       return true;
     } catch (e) {
-      print('Error sending message: $e');
+      AppLogger.error('Error sending message', e);
       return false;
     }
   }
 
-  // Request session extension (requires consent from both users)
-  Future<bool> requestSessionExtension(
-    String sessionId,
+  // Request chat extension (requires consent from both users)
+  Future<bool> requestChatExtension(
+    String chatId,
     int additionalMinutes,
   ) async {
     try {
-      DataSnapshot sessionSnapshot = await _database
-          .child('sessions/$sessionId')
-          .get();
+      DataSnapshot chatSnapshot = await _database.child('chats/$chatId').get();
 
-      if (!sessionSnapshot.exists) return false;
+      if (!chatSnapshot.exists) return false;
 
-      ChatSession session = ChatSession.fromJson(
-        sessionId,
-        Map<String, dynamic>.from(sessionSnapshot.value as Map),
+      Chat chat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!session.isParticipant(userId) || !session.isActive) return false;
+      if (!chat.isParticipant(userId) || !chat.isActive) return false;
 
       // Create extension request
-      await _database.child('extension_requests/$sessionId').set({
+      await _database.child('extension_requests/$chatId').set({
         'requester': userId,
         'additional_minutes': additionalMinutes,
         'requested_at': DateTime.now().millisecondsSinceEpoch,
@@ -160,29 +157,27 @@ class ChatService {
 
       return true;
     } catch (e) {
-      print('Error requesting session extension: $e');
+      AppLogger.error('Error requesting chat extension', e);
       return false;
     }
   }
 
-  // Respond to session extension request
-  Future<bool> respondToExtensionRequest(String sessionId, bool approve) async {
+  // Respond to chat extension request
+  Future<bool> respondToExtensionRequest(String chatId, bool approve) async {
     try {
-      DataSnapshot sessionSnapshot = await _database
-          .child('sessions/$sessionId')
-          .get();
+      DataSnapshot chatSnapshot = await _database.child('chats/$chatId').get();
 
-      if (!sessionSnapshot.exists) return false;
+      if (!chatSnapshot.exists) return false;
 
-      ChatSession session = ChatSession.fromJson(
-        sessionId,
-        Map<String, dynamic>.from(sessionSnapshot.value as Map),
+      Chat chat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!session.isParticipant(userId) || !session.isActive) return false;
+      if (!chat.isParticipant(userId) || !chat.isActive) return false;
 
       DataSnapshot requestSnapshot = await _database
-          .child('extension_requests/$sessionId')
+          .child('extension_requests/$chatId')
           .get();
 
       if (!requestSnapshot.exists) return false;
@@ -196,7 +191,7 @@ class ChatService {
       if (DateTime.now().millisecondsSinceEpoch >
           (request['expires_at'] as int)) {
         // Clean up expired request
-        await _database.child('extension_requests/$sessionId').remove();
+        await _database.child('extension_requests/$chatId').remove();
         return false;
       }
 
@@ -204,53 +199,53 @@ class ChatService {
       if (request['requester'] == userId) return false;
 
       if (approve) {
-        // Extend the session
+        // Extend the chat
         int additionalMinutes = request['additional_minutes'] as int;
         int newExpirationTime = DateTime.now()
             .add(Duration(minutes: additionalMinutes))
             .millisecondsSinceEpoch;
 
         await _database
-            .child('sessions/$sessionId/expires_at')
+            .child('chats/$chatId/expires_at')
             .set(newExpirationTime);
 
         // Update request status
         await _database
-            .child('extension_requests/$sessionId/status')
+            .child('extension_requests/$chatId/status')
             .set('approved');
 
         await _database
-            .child('extension_requests/$sessionId/approved_at')
+            .child('extension_requests/$chatId/approved_at')
             .set(DateTime.now().millisecondsSinceEpoch);
 
         // Clean up request after short delay
         Future.delayed(Duration(seconds: 30), () {
-          _database.child('extension_requests/$sessionId').remove();
+          _database.child('extension_requests/$chatId').remove();
         });
       } else {
         // Reject the request
         await _database
-            .child('extension_requests/$sessionId/status')
+            .child('extension_requests/$chatId/status')
             .set('rejected');
 
         await _database
-            .child('extension_requests/$sessionId/rejected_at')
+            .child('extension_requests/$chatId/rejected_at')
             .set(DateTime.now().millisecondsSinceEpoch);
 
         // Clean up request after short delay
         Future.delayed(Duration(seconds: 30), () {
-          _database.child('extension_requests/$sessionId').remove();
+          _database.child('extension_requests/$chatId').remove();
         });
       }
 
       return true;
     } catch (e) {
-      print('Error responding to extension request: $e');
+      AppLogger.error('Error responding to extension request', e);
       return false;
     }
   }
 
-  // Listen to extension requests for sessions where this user is a participant
+  // Listen to extension requests for chats where this user is a participant
   Stream<List<ExtensionRequest>> getExtensionRequests() {
     return _database.child('extension_requests').onValue.asyncMap((
       event,
@@ -263,26 +258,26 @@ class ChatService {
         );
 
         for (var entry in allRequests.entries) {
-          String sessionId = entry.key;
+          String chatId = entry.key;
           Map<String, dynamic> requestData = entry.value;
 
-          // Check if this user is a participant in the session
-          DataSnapshot sessionSnapshot = await _database
-              .child('sessions/$sessionId')
+          // Check if this user is a participant in the chat
+          DataSnapshot chatSnapshot = await _database
+              .child('chats/$chatId')
               .get();
 
-          if (sessionSnapshot.exists) {
-            ChatSession session = ChatSession.fromJson(
-              sessionId,
-              Map<String, dynamic>.from(sessionSnapshot.value as Map),
+          if (chatSnapshot.exists) {
+            Chat chat = Chat.fromJson(
+              chatId,
+              Map<String, dynamic>.from(chatSnapshot.value as Map),
             );
 
-            // Only include requests for sessions where this user is a participant
+            // Only include requests for chats where this user is a participant
             // and they are not the requester
-            if (session.isParticipant(userId) &&
+            if (chat.isParticipant(userId) &&
                 requestData['requester'] != userId) {
               ExtensionRequest request = ExtensionRequest.fromJson(
-                sessionId,
+                chatId,
                 requestData,
               );
               if (request.isPending && !request.isExpired) {
@@ -297,57 +292,57 @@ class ChatService {
     });
   }
 
-  // Close session manually
-  Future<void> closeSession(String sessionId) async {
+  // Close chat manually
+  Future<void> closeChat(String chatId) async {
     try {
-      await _database.child('sessions/$sessionId/is_active').set(false);
+      await _database.child('chats/$chatId/is_active').set(false);
     } catch (e) {
-      print('Error closing session: $e');
+      AppLogger.error('Error closing chat', e);
     }
   }
 
-  // Get local session data
-  Future<ChatSession?> getSession(String sessionId) async {
-    return await _sessionRepository.getSession(sessionId);
+  // Get local chat data
+  Future<Chat?> getChat(String chatId) async {
+    return await _chatRepository.getChat(chatId);
   }
 
-  // Get local messages for a session
-  Future<List<ChatMessage>> getSessionMessages(String sessionId) async {
-    return await _messageRepository.getSessionMessages(sessionId);
+  // Get local messages for a chat
+  Future<List<Message>> getChatMessages(String chatId) async {
+    return await _messageRepository.getChatMessages(chatId);
   }
 
-  // Get all local active sessions
-  Future<List<ChatSession>> getLocalActiveSessions() async {
-    return await _sessionRepository.getActiveSessions(userId);
+  // Get all local active chats
+  Future<List<Chat>> getLocalActiveChats() async {
+    return await _chatRepository.getActiveChats(userId);
   }
 
-  // Set session nickname (local only)
-  Future<bool> setSessionNickname(String sessionId, String nickname) async {
+  // Set chat nickname (local only)
+  Future<bool> setChatNickname(String chatId, String nickname) async {
     try {
-      await _sessionRepository.setSessionNickname(sessionId, nickname);
+      await _chatRepository.setChatNickname(chatId, nickname);
       return true;
     } catch (e) {
-      print('Error setting session nickname: $e');
+      AppLogger.error('Error setting chat nickname', e);
       return false;
     }
   }
 
-  // Get session nickname
-  Future<String?> getSessionNickname(String sessionId) async {
-    return await _sessionRepository.getSessionNickname(sessionId);
+  // Get chat nickname
+  Future<String?> getChatNickname(String chatId) async {
+    return await _chatRepository.getChatNickname(chatId);
   }
 
-  // QR Session Management Methods
+  // QR Chat Management Methods
 
-  // Create session with specific session ID and QR data
-  Future<bool> createSession({
-    required String sessionId,
+  // Create chat with specific chat ID and QR data
+  Future<bool> createChat({
+    required String chatId,
     required String creatorId,
     required int createdAt,
     required int expiresAt,
   }) async {
     try {
-      final Map<String, dynamic> sessionData = {
+      final Map<String, dynamic> chatData = {
         'creator': creatorId,
         'joiner': userId, // Scanner automatically becomes joiner
         'created_at': createdAt,
@@ -355,72 +350,67 @@ class ChatService {
         'is_active': false, // Initially inactive, waiting for confirmation
       };
 
-      await _database.child('sessions/$sessionId').set(sessionData);
+      await _database.child('chats/$chatId').set(chatData);
 
       return true;
     } catch (e) {
-      print('Error creating session: $e');
+      AppLogger.error('Error creating chat', e);
       return false;
     }
   }
 
-  // Activate session (called by generator to confirm)
-  Future<bool> activateSession(String sessionId) async {
+  // Activate chat (called by generator to confirm)
+  Future<bool> activateChat(String chatId) async {
     try {
-      await _database.child('sessions/$sessionId/is_active').set(true);
+      await _database.child('chats/$chatId/is_active').set(true);
       return true;
     } catch (e) {
-      print('Error activating session: $e');
+      AppLogger.error('Error activating chat', e);
       return false;
     }
   }
 
-  // Listen to a specific session for changes (for QR generator)
-  StreamSubscription<DatabaseEvent>? listenToSessionChanges(
-    String sessionId,
-    void Function(String? joinedUserId, bool isActive) onSessionChanged,
+  // Listen to a specific chat for changes (for QR generator)
+  StreamSubscription<DatabaseEvent>? listenToChatChanges(
+    String chatId,
+    void Function(String? joinedUserId, bool isActive) onChatChanged,
   ) {
     try {
-      return _database.child('sessions/$sessionId').onValue.listen((
-        event,
-      ) async {
+      return _database.child('chats/$chatId').onValue.listen((event) async {
         if (event.snapshot.exists) {
-          final sessionData = Map<String, dynamic>.from(
+          final chatData = Map<String, dynamic>.from(
             event.snapshot.value as Map,
           );
-          final creator = sessionData['creator'] as String?;
-          final joiner = sessionData['joiner'] as String?;
-          final isActive = sessionData['is_active'] as bool? ?? false;
+          final creator = chatData['creator'] as String?;
+          final joiner = chatData['joiner'] as String?;
+          final isActive = chatData['is_active'] as bool? ?? false;
 
-          // If session was created but not active, and current user is the creator,
+          // If chat was created but not active, and current user is the creator,
           // automatically activate it (generator confirms)
           if (!isActive && creator == userId && joiner?.isNotEmpty == true) {
-            await activateSession(sessionId);
+            await activateChat(chatId);
             return; // The listener will trigger again with is_active: true
           }
 
-          onSessionChanged(
-            joiner?.isNotEmpty == true ? joiner : null,
-            isActive,
-          );
+          onChatChanged(joiner?.isNotEmpty == true ? joiner : null, isActive);
         } else {
-          onSessionChanged(null, false);
+          onChatChanged(null, false);
         }
       });
     } catch (e) {
-      print('Error setting up session listener: $e');
+      AppLogger.error('Error setting up chat listener', e);
       return null;
     }
   }
 
   // Private methods
 
-  Future<void> _expireSession(String sessionId) async {
+  Future<void> _expireChat(String chatId) async {
     try {
-      await _database.child('sessions/$sessionId').remove();
-      await _sessionRepository.deleteSession(sessionId);
+      await _database.child('chats/$chatId').remove();
+      await _chatRepository.deleteChat(chatId);
     } catch (e) {
-      print('Error expiring session: $e');
+      AppLogger.error('Error expiring chat', e);
     }
   }
 
@@ -428,16 +418,16 @@ class ChatService {
     try {
       await _database.child('messages/$userId/$messageId').remove();
     } catch (e) {
-      print('Error deleting Firebase message: $e');
+      AppLogger.error('Error deleting Firebase message', e);
     }
   }
 
   // Dispose resources
   void dispose() {
     _messageSubscription?.cancel();
-    _sessionSubscription?.cancel();
+    _chatSubscription?.cancel();
     _messageController.close();
-    _sessionController.close();
+    _chatController.close();
     _extensionRequestController.close();
   }
 }

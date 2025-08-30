@@ -1,5 +1,5 @@
 class ExtensionRequest {
-  final String sessionId;
+  final String chatId;
   final String requester;
   final int additionalMinutes;
   final int requestedAt;
@@ -9,7 +9,7 @@ class ExtensionRequest {
   final int? rejectedAt;
 
   ExtensionRequest({
-    required this.sessionId,
+    required this.chatId,
     required this.requester,
     required this.additionalMinutes,
     required this.requestedAt,
@@ -19,12 +19,9 @@ class ExtensionRequest {
     this.rejectedAt,
   });
 
-  factory ExtensionRequest.fromJson(
-    String sessionId,
-    Map<String, dynamic> json,
-  ) {
+  factory ExtensionRequest.fromJson(String chatId, Map<String, dynamic> json) {
     return ExtensionRequest(
-      sessionId: sessionId,
+      chatId: chatId,
       requester: json['requester'] ?? '',
       additionalMinutes: json['additional_minutes'] ?? 0,
       requestedAt: json['requested_at'] ?? 0,
@@ -52,7 +49,7 @@ class ExtensionRequest {
 
   Map<String, dynamic> toMap() {
     Map<String, dynamic> data = {
-      'session_id': sessionId,
+      'chat_id': chatId,
       'requester': requester,
       'additional_minutes': additionalMinutes,
       'requested_at': requestedAt,
@@ -68,7 +65,7 @@ class ExtensionRequest {
 
   factory ExtensionRequest.fromMap(Map<String, dynamic> map) {
     return ExtensionRequest(
-      sessionId: map['session_id'] as String,
+      chatId: map['chat_id'] as String,
       requester: map['requester'] as String,
       additionalMinutes: map['additional_minutes'] as int,
       requestedAt: map['requested_at'] as int,
@@ -86,6 +83,6 @@ class ExtensionRequest {
 
   @override
   String toString() {
-    return 'ExtensionRequest(sessionId: $sessionId, requester: $requester, additionalMinutes: $additionalMinutes, status: $status)';
+    return 'ExtensionRequest(chatId: $chatId, requester: $requester, additionalMinutes: $additionalMinutes, status: $status)';
   }
 }

@@ -1,28 +1,28 @@
-class ChatMessage {
+class Message {
   final String messageId;
   final String sender;
   final String recipient;
   final String text;
   final int timestamp;
-  final String sessionId;
+  final String chatId;
 
-  ChatMessage({
+  Message({
     required this.messageId,
     required this.sender,
     required this.recipient,
     required this.text,
     required this.timestamp,
-    required this.sessionId,
+    required this.chatId,
   });
 
-  factory ChatMessage.fromJson(String messageId, Map<String, dynamic> json) {
-    return ChatMessage(
+  factory Message.fromJson(String messageId, Map<String, dynamic> json) {
+    return Message(
       messageId: messageId,
       sender: json['sender'] ?? '',
       recipient: json['recipient'] ?? '',
       text: json['text'] ?? '',
       timestamp: json['timestamp'] ?? 0,
-      sessionId: json['session_id'] ?? '',
+      chatId: json['chat_id'] ?? '',
     );
   }
 
@@ -32,7 +32,7 @@ class ChatMessage {
       'recipient': recipient,
       'text': text,
       'timestamp': timestamp,
-      'session_id': sessionId,
+      'chat_id': chatId,
     };
   }
 
@@ -43,23 +43,23 @@ class ChatMessage {
       'recipient': recipient,
       'text': text,
       'timestamp': timestamp,
-      'session_id': sessionId,
+      'chat_id': chatId,
     };
   }
 
-  factory ChatMessage.fromMap(Map<String, dynamic> map) {
-    return ChatMessage(
+  factory Message.fromMap(Map<String, dynamic> map) {
+    return Message(
       messageId: map['message_id'] as String,
       sender: map['sender'] as String,
       recipient: map['recipient'] as String,
       text: map['text'] as String,
       timestamp: map['timestamp'] as int,
-      sessionId: map['session_id'] as String,
+      chatId: map['chat_id'] as String,
     );
   }
 
   @override
   String toString() {
-    return 'ChatMessage(messageId: $messageId, sender: $sender, recipient: $recipient, text: $text, timestamp: $timestamp, sessionId: $sessionId)';
+    return 'Message(messageId: $messageId, sender: $sender, recipient: $recipient, text: $text, timestamp: $timestamp, chatId: $chatId)';
   }
 }
