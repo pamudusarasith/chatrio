@@ -221,6 +221,38 @@ class ScanQRViewModel extends ChangeNotifier {
   // Public method for UI to clear errors
   void clearError() => _clearError();
 
+  // Handle start chatting action
+  Future<bool> startChatting(String nickname) async {
+    if (_chatId == null) {
+      _setError('No active chat to save');
+      return false;
+    }
+
+    try {
+      _setLoading(true);
+
+      // Save chat locally with nickname
+      bool success = await _chatService.saveChatLocally(_chatId!, nickname);
+
+      if (success) {
+        AppLogger.info(
+          'Chat saved locally for scanner with nickname: $nickname',
+        );
+        _clearError();
+        return true;
+      } else {
+        _setError('Failed to save chat locally');
+        return false;
+      }
+    } catch (e) {
+      AppLogger.error('Error starting chat for scanner', e);
+      _setError('Error starting chat: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   @override
   void dispose() {
     _stopListening();

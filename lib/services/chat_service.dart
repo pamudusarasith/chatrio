@@ -332,6 +332,46 @@ class ChatService {
     return await _chatRepository.getChatNickname(chatId);
   }
 
+  // Save chat locally with nickname
+  Future<bool> saveChatLocally(String chatId, String nickname) async {
+    try {
+      // Get the chat data from Firebase
+      DataSnapshot chatSnapshot = await _database.child('chats/$chatId').get();
+
+      if (!chatSnapshot.exists) {
+        AppLogger.error(
+          'Chat not found in Firebase when trying to save locally',
+        );
+        return false;
+      }
+
+      Chat chat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(chatSnapshot.value as Map),
+      );
+
+      // Check if user is a participant
+      if (!chat.isParticipant(userId)) {
+        AppLogger.error('User is not a participant in this chat');
+        return false;
+      }
+
+      // Save chat locally
+      await _chatRepository.insertChat(chat);
+
+      // Set nickname if provided
+      if (nickname.isNotEmpty) {
+        await _chatRepository.setChatNickname(chatId, nickname);
+      }
+
+      AppLogger.info('Chat saved locally with nickname: $nickname');
+      return true;
+    } catch (e) {
+      AppLogger.error('Error saving chat locally', e);
+      return false;
+    }
+  }
+
   // QR Chat Management Methods
 
   // Create chat with specific chat ID and QR data
