@@ -151,6 +151,41 @@ class GenerateQRViewModel extends ChangeNotifier {
     _chatSubscription = null;
   }
 
+  // Handle start chatting action
+  Future<bool> startChatting(String nickname) async {
+    if (_currentChatId == null || _chatService == null) {
+      _setError('No active chat to save');
+      return false;
+    }
+
+    try {
+      _setLoading(true);
+
+      // Save chat locally with nickname
+      bool success = await _chatService!.saveChatLocally(
+        _currentChatId!,
+        nickname,
+      );
+
+      if (success) {
+        AppLogger.info(
+          'Chat saved locally for generator with nickname: $nickname',
+        );
+        _clearError();
+        return true;
+      } else {
+        _setError('Failed to save chat locally');
+        return false;
+      }
+    } catch (e) {
+      AppLogger.error('Error starting chat for generator', e);
+      _setError('Error starting chat: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   @override
   void dispose() {
     _stopChatListening();

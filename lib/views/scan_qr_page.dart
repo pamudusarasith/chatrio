@@ -6,6 +6,7 @@ import '../widgets/success_view_widget.dart';
 import '../widgets/waiting_view_widget.dart';
 import '../widgets/loading_view_widget.dart';
 import '../widgets/error_view_widget.dart';
+import '../widgets/nickname_dialog.dart';
 
 class ScanQrPage extends StatelessWidget {
   const ScanQrPage({super.key, required this.viewModel});
@@ -57,7 +58,24 @@ class ScanQrPage extends StatelessWidget {
               viewModel.chatId != null &&
               !viewModel.isLoading &&
               !viewModel.isCreating) {
-            return const SuccessViewWidget();
+            return SuccessViewWidget(
+              onButtonPressed: () async {
+                // Show nickname dialog
+                String? nickname = await showDialog<String>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const NicknameDialog(),
+                );
+                if (nickname != null) {
+                  // Save chat with nickname
+                  bool success = await viewModel.startChatting(nickname);
+                  if (success && context.mounted) {
+                    // Navigate to home or chat list
+                    context.go('/');
+                  }
+                }
+              },
+            );
           }
 
           // Show waiting for activation state

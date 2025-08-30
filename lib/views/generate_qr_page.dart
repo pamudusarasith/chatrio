@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../viewmodels/generate_qr_view_model.dart';
 import '../widgets/success_view_widget.dart';
 import '../widgets/loading_view_widget.dart';
 import '../widgets/error_view_widget.dart';
+import '../widgets/nickname_dialog.dart';
 
 class GenerateQRPage extends StatelessWidget {
   const GenerateQRPage({super.key, required this.viewModel});
@@ -65,10 +67,26 @@ class GenerateQRPage extends StatelessWidget {
 
               // Show success state when session is activated
               if (viewModel.isChatActive && viewModel.joinedUserId != null) {
-                return const SuccessViewWidget(
+                return SuccessViewWidget(
                   title: 'Someone Connected!',
                   subtitle: 'Your chat session is now active',
                   buttonText: 'Start Chatting',
+                  onButtonPressed: () async {
+                    // Show nickname dialog
+                    String? nickname = await showDialog<String>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const NicknameDialog(),
+                    );
+                    if (nickname != null) {
+                      // Save chat with nickname
+                      bool success = await viewModel.startChatting(nickname);
+                      if (success && context.mounted) {
+                        // Navigate to home or chat list
+                        context.go('/');
+                      }
+                    }
+                  },
                 );
               }
 
