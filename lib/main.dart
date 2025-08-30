@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'providers.dart';
 import 'router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MainApp());
+  runApp(MultiProvider(providers: providers, child: const MainApp()));
 }
 
 class MainApp extends StatelessWidget {
@@ -21,7 +23,6 @@ class MainApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color.fromARGB(255, 25, 200, 200),
           primary: const Color.fromARGB(255, 25, 200, 200),
-          // brightness: MediaQuery.platformBrightnessOf(context),
           brightness: Brightness.light,
         ),
       ),
