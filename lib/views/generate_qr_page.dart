@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../viewmodels/generate_qr_view_model.dart';
+import '../widgets/success_view_widget.dart';
+import '../widgets/loading_view_widget.dart';
+import '../widgets/error_view_widget.dart';
 
 class GenerateQRPage extends StatelessWidget {
   const GenerateQRPage({super.key, required this.viewModel});
@@ -47,50 +50,25 @@ class GenerateQRPage extends StatelessWidget {
             listenable: viewModel,
             builder: (context, child) {
               if (viewModel.isLoading) {
-                return const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Generating QR Code...'),
-                  ],
+                return const LoadingViewWidget(
+                  message: 'Generating QR Code...',
                 );
               }
 
               if (viewModel.errorMessage != null) {
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      viewModel.errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: () => viewModel.clearError(),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Try Again'),
-                    ),
-                  ],
+                return ErrorViewWidget(
+                  errorMessage: viewModel.errorMessage!,
+                  onRetry: () => viewModel.generateNewQRCode(),
+                  retryButtonText: 'Try Again',
+                );
+              }
+
+              // Show success state when session is activated
+              if (viewModel.isSessionActive && viewModel.joinedUserId != null) {
+                return const SuccessViewWidget(
+                  title: 'Someone Connected!',
+                  subtitle: 'Your chat session is now active',
+                  buttonText: 'Start Chatting',
                 );
               }
 
