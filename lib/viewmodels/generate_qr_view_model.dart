@@ -1,12 +1,15 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/user.dart';
-import '../repositories/user_repository.dart';
+import '../services/user_service.dart';
+import '../services/qr_service.dart';
+import '../services/chat_service.dart';
 
 class GenerateQRViewModel extends ChangeNotifier {
-  final UserRepository _userRepository;
+  final UserService _userService = UserService();
   final Uuid _uuid = const Uuid();
+  ChatService? _chatService;
 
   // State variables
   bool _isLoading = false;
@@ -14,9 +17,13 @@ class GenerateQRViewModel extends ChangeNotifier {
   String? _currentSessionId;
   String? _errorMessage;
   bool _isQRGenerated = false;
+  bool _isSessionActive = false;
+  String? _joinedUserId;
 
-  GenerateQRViewModel(UserRepository userRepository)
-    : _userRepository = userRepository {
+  // Stream subscription for session changes
+  StreamSubscription? _sessionSubscription;
+
+  GenerateQRViewModel() {
     _initializeUser();
   }
 
@@ -26,45 +33,55 @@ class GenerateQRViewModel extends ChangeNotifier {
   String? get currentSessionId => _currentSessionId;
   String? get errorMessage => _errorMessage;
   bool get isQRGenerated => _isQRGenerated;
+  bool get isSessionActive => _isSessionActive;
+  String? get joinedUserId => _joinedUserId;
 
   String get qrCodeData {
     if (_currentUserId == null || _currentSessionId == null) {
       return '';
     }
-    return jsonEncode({
-      'userId': _currentUserId,
-      'sessionId': _currentSessionId,
-    });
+    // Use QR service to generate properly formatted QR data
+    return QRService.generateSessionQR(_currentSessionId!, _currentUserId!);
   }
 
   Future<void> _initializeUser() async {
     _setLoading(true);
     try {
-      // Check if user already exists
-      User? existingUser = await _userRepository.getCurrentUser();
+      User currentUser = await _userService.getCurrentUser();
+      _currentUserId = currentUser.id;
 
-      if (existingUser != null) {
-        _currentUserId = existingUser.id;
-      } else {
-        // Generate new persistent user ID
-        _currentUserId = _uuid.v4();
-        final user = User(id: _currentUserId!, createdAt: DateTime.now());
-        await _userRepository.saveUser(user);
-      }
+      // Initialize chat service
+      _chatService = ChatService(userId: _currentUserId!);
 
       // Always generate a new session ID on initialization
       _generateNewSessionId();
       _isQRGenerated = true;
       _clearError();
     } catch (e) {
-      _setError('Failed to initialize user: $e');
+      _setError('User initialization failed. Restart the app.');
     } finally {
       _setLoading(false);
     }
   }
 
   void _generateNewSessionId() {
+    if (_currentUserId == null) {
+      _setError('User initialization failed. Restart the app.');
+      return;
+    }
+
+    // Stop listening to previous session if any
+    _stopSessionListening();
+
+    // Reset session state
+    _isSessionActive = false;
+    _joinedUserId = null;
+
     _currentSessionId = _uuid.v4();
+
+    // Start listening for when someone joins this session
+    _startSessionListening();
+
     notifyListeners();
   }
 
@@ -92,11 +109,6 @@ class GenerateQRViewModel extends ChangeNotifier {
     }
   }
 
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
-  }
-
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
@@ -110,5 +122,37 @@ class GenerateQRViewModel extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  // Public method for UI to clear errors
+  void clearError() => _clearError();
+
+  // Session listening methods
+  void _startSessionListening() {
+    if (_currentSessionId == null || _chatService == null) return;
+
+    _sessionSubscription = _chatService!.listenToSessionChanges(
+      _currentSessionId!,
+      (joinedUserId, isActive) {
+        if (joinedUserId != null && joinedUserId.isNotEmpty) {
+          // Someone joined the session!
+          _isSessionActive = true;
+          _joinedUserId = joinedUserId;
+          print('User $joinedUserId joined session $_currentSessionId');
+          notifyListeners();
+        }
+      },
+    );
+  }
+
+  void _stopSessionListening() {
+    _sessionSubscription?.cancel();
+    _sessionSubscription = null;
+  }
+
+  @override
+  void dispose() {
+    _stopSessionListening();
+    super.dispose();
   }
 }

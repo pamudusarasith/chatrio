@@ -23,7 +23,6 @@ class MainApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color.fromARGB(255, 25, 200, 200),
           primary: const Color.fromARGB(255, 25, 200, 200),
-          // brightness: MediaQuery.platformBrightnessOf(context),
           brightness: Brightness.light,
         ),
       ),
