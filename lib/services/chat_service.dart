@@ -57,8 +57,16 @@ class ChatService {
 
   // Initialize Firebase listeners
   Future<void> _initialize() async {
-    // First, retrieve all pending messages and clear the queue
-    await _retrieveAllPendingMessages();
+    // First, retrieve all pending messages and clear the queue (with timeout)
+    try {
+      await _retrieveAllPendingMessages().timeout(const Duration(seconds: 6));
+    } on TimeoutException {
+      AppLogger.warning(
+        'Pending messages retrieval timed out; starting listeners anyway',
+      );
+    } catch (e, st) {
+      AppLogger.error('Error retrieving pending messages', e, st);
+    }
 
     // Then start listening for new messages
     _listenToIncomingMessages();
@@ -72,9 +80,14 @@ class ChatService {
         .onChildAdded
         .listen((event) async {
           try {
+            final key = event.snapshot.key;
+            final raw = event.snapshot.value;
+            if (key == null || raw == null || raw is! Map) {
+              return; // Ignore malformed entries
+            }
             Message message = Message.fromJson(
-              event.snapshot.key!,
-              Map<String, dynamic>.from(event.snapshot.value as Map),
+              key,
+              Map<String, dynamic>.from(raw),
             );
 
             // Store message locally
@@ -106,9 +119,12 @@ class ChatService {
       DataSnapshot snapshot = await _database.child('messages/$userId').get();
 
       if (snapshot.exists) {
-        Map<String, dynamic> messagesData = Map<String, dynamic>.from(
-          snapshot.value as Map,
-        );
+        final raw = snapshot.value;
+        if (raw == null || raw is! Map) {
+          AppLogger.warning('Pending messages payload malformed; skipping');
+          return;
+        }
+        Map<String, dynamic> messagesData = Map<String, dynamic>.from(raw);
 
         List<Message> messages = [];
 
@@ -116,6 +132,9 @@ class ChatService {
         for (var entry in messagesData.entries) {
           try {
             String messageId = entry.key;
+            if (entry.value is! Map) {
+              continue; // Skip invalid message entry
+            }
             Map<String, dynamic> messageData = Map<String, dynamic>.from(
               entry.value,
             );

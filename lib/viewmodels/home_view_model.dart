@@ -14,7 +14,22 @@ class HomeViewModel extends ChangeNotifier {
   bool _isUserInitialized = false;
 
   HomeViewModel() {
-    _initializeUser();
+    _bootstrap();
+  }
+
+  void _bootstrap() {
+    // If SplashPage already initialized ChatService, adopt it immediately
+    final existing = ChatService.instance;
+    if (existing != null) {
+      _chatService = existing;
+      _currentUserId = existing.userId;
+      _isUserInitialized = true;
+      _clearError();
+      notifyListeners();
+    } else {
+      // Fallback: initialize when Splash wasn't used (e.g., deep link)
+      _initializeUser();
+    }
   }
 
   // Getters
