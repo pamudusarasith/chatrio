@@ -10,7 +10,7 @@ import '../utils/logger.dart';
 class ScanQRViewModel extends ChangeNotifier {
   final UserService _userService = UserService();
   late MobileScannerController _scannerController;
-  late ChatService _chatService;
+  ChatService? _chatService;
   StreamSubscription? _chatSubscription;
 
   // State variables
@@ -55,8 +55,12 @@ class ScanQRViewModel extends ChangeNotifier {
       // Initialize scanner only after user is successfully initialized
       _initializeScanner();
 
-      // Initialize chat service
-      _chatService = ChatService(userId: _currentUserId!);
+      // Use the singleton ChatService instance or create/initialize it
+      _chatService = ChatService.instance;
+      if (_chatService == null || _chatService!.userId != _currentUserId!) {
+        _chatService = ChatService(userId: _currentUserId!);
+        await _chatService!.initialize();
+      }
 
       _clearError();
     } catch (e) {
@@ -144,8 +148,12 @@ class ScanQRViewModel extends ChangeNotifier {
     try {
       AppLogger.info('Automatically creating chat...');
 
+      if (_chatService == null) {
+        throw Exception('Chat service not initialized');
+      }
+
       // Use chat service to create the chat
-      bool success = await _chatService.createChat(
+      bool success = await _chatService!.createChat(
         chatId: _chatId!,
         creatorId: _parsedQRData!['creator_id'],
         createdAt: _parsedQRData!['created_at'],
@@ -181,7 +189,12 @@ class ScanQRViewModel extends ChangeNotifier {
 
     AppLogger.info('Waiting for generator to activate chat...');
 
-    _chatSubscription = _chatService.listenToChatChanges(_chatId!, (
+    if (_chatService == null) {
+      _setError('Chat service not initialized');
+      return;
+    }
+
+    _chatSubscription = _chatService!.listenToChatChanges(_chatId!, (
       joinedUserId,
       isActive,
     ) {
@@ -231,8 +244,12 @@ class ScanQRViewModel extends ChangeNotifier {
     try {
       _setLoading(true);
 
+      if (_chatService == null) {
+        throw Exception('Chat service not initialized');
+      }
+
       // Save chat locally with nickname
-      bool success = await _chatService.saveChatLocally(_chatId!, nickname);
+      bool success = await _chatService!.saveChatLocally(_chatId!, nickname);
 
       if (success) {
         AppLogger.info(

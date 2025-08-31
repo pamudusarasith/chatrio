@@ -8,6 +8,8 @@ import '../repositories/message_repository.dart';
 import '../utils/logger.dart';
 
 class ChatService {
+  static ChatService? _instance;
+
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   final ChatRepository _chatRepository = ChatRepository();
   final MessageRepository _messageRepository = MessageRepository();
@@ -23,8 +25,28 @@ class ChatService {
   final StreamController<List<ExtensionRequest>> _extensionRequestController =
       StreamController<List<ExtensionRequest>>.broadcast();
 
-  ChatService({required this.userId}) {
-    _initializeListeners();
+  bool _isInitialized = false;
+
+  ChatService._internal({required this.userId});
+
+  // Singleton factory constructor
+  factory ChatService({required String userId}) {
+    if (_instance == null || _instance!.userId != userId) {
+      _instance?.dispose(); // Dispose previous instance if exists
+      _instance = ChatService._internal(userId: userId);
+    }
+    return _instance!;
+  }
+
+  // Get existing instance (returns null if not initialized)
+  static ChatService? get instance => _instance;
+
+  // Public initialization method
+  Future<void> initialize() async {
+    if (!_isInitialized) {
+      await _initialize();
+      _isInitialized = true;
+    }
   }
 
   // Streams
@@ -34,7 +56,11 @@ class ChatService {
       _extensionRequestController.stream;
 
   // Initialize Firebase listeners
-  void _initializeListeners() {
+  Future<void> _initialize() async {
+    // First, retrieve all pending messages and clear the queue
+    await _retrieveAllPendingMessages();
+
+    // Then start listening for new messages
     _listenToIncomingMessages();
     _listenToExtensionRequests();
   }
@@ -70,6 +96,61 @@ class ChatService {
     getExtensionRequests().listen((requests) {
       _extensionRequestController.add(requests);
     });
+  }
+
+  // Retrieve all pending messages and clear the Firebase queue
+  Future<void> _retrieveAllPendingMessages() async {
+    try {
+      AppLogger.info('Retrieving all pending messages for user: $userId');
+
+      DataSnapshot snapshot = await _database.child('messages/$userId').get();
+
+      if (snapshot.exists) {
+        Map<String, dynamic> messagesData = Map<String, dynamic>.from(
+          snapshot.value as Map,
+        );
+
+        List<Message> messages = [];
+
+        // Process each message
+        for (var entry in messagesData.entries) {
+          try {
+            String messageId = entry.key;
+            Map<String, dynamic> messageData = Map<String, dynamic>.from(
+              entry.value,
+            );
+
+            Message message = Message.fromJson(messageId, messageData);
+            messages.add(message);
+
+            // Store message locally
+            await _messageRepository.insertMessage(message);
+
+            AppLogger.info(
+              'Retrieved message: ${message.messageId} from ${message.sender}',
+            );
+          } catch (e) {
+            AppLogger.error('Error processing message ${entry.key}', e);
+          }
+        }
+
+        // Clear all messages from Firebase after successful retrieval
+        await _database.child('messages/$userId').remove();
+
+        // Emit all messages to the stream
+        for (Message message in messages) {
+          _messageController.add(message);
+        }
+
+        AppLogger.info(
+          'Successfully retrieved and cleared ${messages.length} pending messages',
+        );
+      } else {
+        AppLogger.info('No pending messages found for user: $userId');
+      }
+    } catch (e) {
+      AppLogger.error('Error retrieving pending messages', e);
+    }
   }
 
   // Send message (only if chat is valid)
