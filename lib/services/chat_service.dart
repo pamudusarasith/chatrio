@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
-import '../models/extension_request.dart';
 import '../repositories/chat_repository.dart';
 import '../repositories/message_repository.dart';
 import '../utils/logger.dart';
@@ -16,14 +15,9 @@ class ChatService {
   final String userId;
 
   StreamSubscription<DatabaseEvent>? _messageSubscription;
-  StreamSubscription<DatabaseEvent>? _chatSubscription;
 
   final StreamController<Message> _messageController =
       StreamController<Message>.broadcast();
-  final StreamController<List<Chat>> _chatController =
-      StreamController<List<Chat>>.broadcast();
-  final StreamController<List<ExtensionRequest>> _extensionRequestController =
-      StreamController<List<ExtensionRequest>>.broadcast();
 
   bool _isInitialized = false;
 
@@ -51,9 +45,6 @@ class ChatService {
 
   // Streams
   Stream<Message> get incomingMessages => _messageController.stream;
-  Stream<List<Chat>> get activeChats => _chatController.stream;
-  Stream<List<ExtensionRequest>> get extensionRequests =>
-      _extensionRequestController.stream;
 
   // Initialize Firebase listeners
   Future<void> _initialize() async {
@@ -70,7 +61,6 @@ class ChatService {
 
     // Then start listening for new messages
     _listenToIncomingMessages();
-    _listenToExtensionRequests();
   }
 
   // Listen to incoming messages for this user
@@ -102,13 +92,6 @@ class ChatService {
             AppLogger.error('Error processing incoming message', e);
           }
         });
-  }
-
-  // Listen to extension requests
-  void _listenToExtensionRequests() {
-    getExtensionRequests().listen((requests) {
-      _extensionRequestController.add(requests);
-    });
   }
 
   // Retrieve all pending messages and clear the Firebase queue
@@ -263,155 +246,6 @@ class ChatService {
     }
   }
 
-  // Respond to chat extension request
-  Future<bool> respondToExtensionRequest(String chatId, bool approve) async {
-    try {
-      DataSnapshot chatSnapshot = await _database.child('chats/$chatId').get();
-
-      if (!chatSnapshot.exists) return false;
-
-      Chat chat = Chat.fromJson(
-        chatId,
-        Map<String, dynamic>.from(chatSnapshot.value as Map),
-      );
-
-      // Allow responding if participant, regardless of active flag.
-      if (!chat.isParticipant(userId)) return false;
-
-      DataSnapshot requestSnapshot = await _database
-          .child('extension_requests/$chatId')
-          .get();
-
-      if (!requestSnapshot.exists) return false;
-
-      Map<String, dynamic> request = Map<String, dynamic>.from(
-        requestSnapshot.value as Map,
-      );
-
-      // Check if request is still valid
-      if (request['status'] != 'pending') return false;
-      if (DateTime.now().millisecondsSinceEpoch >
-          (request['expires_at'] as int)) {
-        // Clean up expired request
-        await _database.child('extension_requests/$chatId').remove();
-        return false;
-      }
-
-      // Check if the current user is not the requester
-      if (request['requester'] == userId) return false;
-
-      if (approve) {
-        // Extend the chat
-        int additionalMinutes = request['additional_minutes'] as int;
-        int newExpirationTime = DateTime.now()
-            .add(Duration(minutes: additionalMinutes))
-            .millisecondsSinceEpoch;
-
-        await _database
-            .child('chats/$chatId/expires_at')
-            .set(newExpirationTime);
-
-        // Ensure chat is marked active again upon extension approval
-        await _database.child('chats/$chatId/is_active').set(true);
-
-        // Update request status
-        await _database
-            .child('extension_requests/$chatId/status')
-            .set('approved');
-
-        await _database
-            .child('extension_requests/$chatId/approved_at')
-            .set(DateTime.now().millisecondsSinceEpoch);
-
-        // Sync local chat with updated state
-        await syncChatFromFirebase(chatId);
-
-        // Clean up request after short delay
-        Future.delayed(Duration(seconds: 30), () {
-          _database.child('extension_requests/$chatId').remove();
-        });
-      } else {
-        // Reject the request
-        await _database
-            .child('extension_requests/$chatId/status')
-            .set('rejected');
-
-        await _database
-            .child('extension_requests/$chatId/rejected_at')
-            .set(DateTime.now().millisecondsSinceEpoch);
-
-        // Sync local chat (no change to chat in this branch but keep parity)
-        await syncChatFromFirebase(chatId);
-
-        // Clean up request after short delay
-        Future.delayed(Duration(seconds: 30), () {
-          _database.child('extension_requests/$chatId').remove();
-        });
-      }
-
-      return true;
-    } catch (e) {
-      AppLogger.error('Error responding to extension request', e);
-      return false;
-    }
-  }
-
-  // Listen to extension requests for chats where this user is a participant
-  Stream<List<ExtensionRequest>> getExtensionRequests() {
-    return _database.child('extension_requests').onValue.asyncMap((
-      event,
-    ) async {
-      List<ExtensionRequest> requests = [];
-
-      if (event.snapshot.exists) {
-        Map<String, dynamic> allRequests = Map<String, dynamic>.from(
-          event.snapshot.value as Map,
-        );
-
-        for (var entry in allRequests.entries) {
-          String chatId = entry.key;
-          Map<String, dynamic> requestData = entry.value;
-
-          // Check if this user is a participant in the chat
-          DataSnapshot chatSnapshot = await _database
-              .child('chats/$chatId')
-              .get();
-
-          if (chatSnapshot.exists) {
-            Chat chat = Chat.fromJson(
-              chatId,
-              Map<String, dynamic>.from(chatSnapshot.value as Map),
-            );
-
-            // Only include requests for chats where this user is a participant
-            // and they are not the requester
-            if (chat.isParticipant(userId) &&
-                requestData['requester'] != userId) {
-              ExtensionRequest request = ExtensionRequest.fromJson(
-                chatId,
-                requestData,
-              );
-              if (request.isPending && !request.isExpired) {
-                requests.add(request);
-              }
-            }
-          }
-        }
-      }
-
-      return requests;
-    });
-  }
-
-  // Close chat manually
-  Future<void> closeChat(String chatId) async {
-    try {
-      await _database.child('chats/$chatId/is_active').set(false);
-    } catch (e) {
-      AppLogger.error('Error closing chat', e);
-    }
-  }
-
   // Get local chat data
   Future<Chat?> getChat(String chatId) async {
     return await _chatRepository.getChat(chatId);
@@ -420,11 +254,6 @@ class ChatService {
   // Get local messages for a chat
   Future<List<Message>> getChatMessages(String chatId) async {
     return await _messageRepository.getChatMessages(chatId);
-  }
-
-  // Get all local active chats
-  Future<List<Chat>> getLocalActiveChats() async {
-    return await _chatRepository.getActiveChats(userId);
   }
 
   // Set chat nickname (local only)
@@ -472,7 +301,11 @@ class ChatService {
         await _chatRepository.insertChat(chat);
       } else {
         await _chatRepository.updateChat(chat);
-        await _chatRepository.setChatNickname(chatId, existing.nickname!);
+        // Preserve existing nickname if present
+        final nick = existing.nickname;
+        if (nick != null && nick.isNotEmpty) {
+          await _chatRepository.setChatNickname(chatId, nick);
+        }
       }
       return true;
     } catch (e) {
@@ -615,9 +448,6 @@ class ChatService {
   // Dispose resources
   void dispose() {
     _messageSubscription?.cancel();
-    _chatSubscription?.cancel();
     _messageController.close();
-    _chatController.close();
-    _extensionRequestController.close();
   }
 }
