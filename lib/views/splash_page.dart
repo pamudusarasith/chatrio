@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
-
-import '../router.dart';
 import '../utils/logger.dart';
 import '../firebase_options.dart';
 import '../database/database_manager.dart';
@@ -59,7 +58,7 @@ class _SplashPageState extends State<SplashPage> {
 
       if (!mounted) return;
       // Navigate to home
-      context.navigate('/');
+      context.go('/');
     } catch (e) {
       setState(() => _error = 'Initialization failed: $e');
     }

@@ -19,6 +19,7 @@ class ChatPageViewModel extends ChangeNotifier {
   final TextEditingController messageController = TextEditingController();
 
   StreamSubscription<Message>? _messageSubscription;
+  StreamSubscription? _chatStatusSubscription;
 
   Chat? get chat => _chat;
   List<Message> get messages => _messages;
@@ -46,6 +47,7 @@ class ChatPageViewModel extends ChangeNotifier {
 
       await _loadChat();
       await _loadMessages();
+      _setupChatStatusListener();
       _setupMessageListener();
       _clearError();
     } catch (e) {
@@ -107,6 +109,16 @@ class ChatPageViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteChat() async {
+    try {
+      if (_chatService == null) return false;
+      final ok = await _chatService!.deleteLocalChat(chatId);
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _setupMessageListener() {
     if (_chatService == null) return;
 
@@ -114,6 +126,24 @@ class ChatPageViewModel extends ChangeNotifier {
       // Only add messages for this chat
       if (message.chatId == chatId) {
         _loadMessages(); // Reload messages when new message arrives
+      }
+    });
+  }
+
+  void _setupChatStatusListener() {
+    if (_chatService == null) return;
+    _chatStatusSubscription?.cancel();
+    _chatStatusSubscription = _chatService!.listenToChatChanges(chatId, (
+      joinedUserId,
+      isActive,
+    ) async {
+      try {
+        // Sync latest chat state from Firebase into local DB
+        await _chatService!.syncChatFromFirebase(chatId);
+        // Reload chat and reflect state changes (e.g., extension approval)
+        await _loadChat();
+      } catch (_) {
+        // ignore transient errors
       }
     });
   }
@@ -163,6 +193,7 @@ class ChatPageViewModel extends ChangeNotifier {
   void dispose() {
     messageController.dispose();
     _messageSubscription?.cancel();
+    _chatStatusSubscription?.cancel();
     // Don't dispose the singleton ChatService, just cancel our subscription
     super.dispose();
   }

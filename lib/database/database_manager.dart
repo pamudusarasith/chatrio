@@ -65,14 +65,8 @@ class DatabaseManager {
 
   // Cleanup Methods
   Future<void> cleanupExpiredData() async {
-    final db = await database;
-    final currentTime = DateTime.now().millisecondsSinceEpoch;
-
-    // Delete expired chats
-    await db.delete(
-      'chats',
-      where: 'expires_at <= ?',
-      whereArgs: [currentTime],
-    );
+    // Intentionally left blank: we no longer delete expired chats locally.
+    // Keeping expired chats allows users to request extensions or delete them manually.
+    // If you need other cleanup (like pruning very old messages), add it here safely.
   }
 }

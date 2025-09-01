@@ -242,7 +242,8 @@ class ChatService {
         Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!chat.isParticipant(userId) || !chat.isActive) return false;
+      // Allow requesting extension if participant, regardless of active flag.
+      if (!chat.isParticipant(userId)) return false;
 
       // Create extension request
       await _database.child('extension_requests/$chatId').set({
@@ -274,7 +275,8 @@ class ChatService {
         Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!chat.isParticipant(userId) || !chat.isActive) return false;
+      // Allow responding if participant, regardless of active flag.
+      if (!chat.isParticipant(userId)) return false;
 
       DataSnapshot requestSnapshot = await _database
           .child('extension_requests/$chatId')
@@ -309,6 +311,9 @@ class ChatService {
             .child('chats/$chatId/expires_at')
             .set(newExpirationTime);
 
+        // Ensure chat is marked active again upon extension approval
+        await _database.child('chats/$chatId/is_active').set(true);
+
         // Update request status
         await _database
             .child('extension_requests/$chatId/status')
@@ -317,6 +322,9 @@ class ChatService {
         await _database
             .child('extension_requests/$chatId/approved_at')
             .set(DateTime.now().millisecondsSinceEpoch);
+
+        // Sync local chat with updated state
+        await syncChatFromFirebase(chatId);
 
         // Clean up request after short delay
         Future.delayed(Duration(seconds: 30), () {
@@ -331,6 +339,9 @@ class ChatService {
         await _database
             .child('extension_requests/$chatId/rejected_at')
             .set(DateTime.now().millisecondsSinceEpoch);
+
+        // Sync local chat (no change to chat in this branch but keep parity)
+        await syncChatFromFirebase(chatId);
 
         // Clean up request after short delay
         Future.delayed(Duration(seconds: 30), () {
@@ -430,6 +441,44 @@ class ChatService {
   // Get chat nickname
   Future<String?> getChatNickname(String chatId) async {
     return await _chatRepository.getChatNickname(chatId);
+  }
+
+  // Delete a chat locally (and its messages)
+  Future<bool> deleteLocalChat(String chatId) async {
+    try {
+      // Delete messages first for safety (SQLite FKs may not be enforced)
+      await _messageRepository.deleteChatMessages(chatId);
+      await _chatRepository.deleteChat(chatId);
+      return true;
+    } catch (e) {
+      AppLogger.error('Error deleting local chat', e);
+      return false;
+    }
+  }
+
+  // Sync a chat from Firebase into local database
+  Future<bool> syncChatFromFirebase(String chatId) async {
+    try {
+      final snap = await _database.child('chats/$chatId').get();
+      if (!snap.exists) return false;
+      final chat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(snap.value as Map),
+      );
+      if (!chat.isParticipant(userId)) return false;
+
+      final existing = await _chatRepository.getChat(chatId);
+      if (existing == null) {
+        await _chatRepository.insertChat(chat);
+      } else {
+        await _chatRepository.updateChat(chat);
+        await _chatRepository.setChatNickname(chatId, existing.nickname!);
+      }
+      return true;
+    } catch (e) {
+      AppLogger.error('Error syncing chat from Firebase', e);
+      return false;
+    }
   }
 
   // Save chat locally with nickname
@@ -547,8 +596,9 @@ class ChatService {
 
   Future<void> _expireChat(String chatId) async {
     try {
-      await _database.child('chats/$chatId').remove();
-      await _chatRepository.deleteChat(chatId);
+      // Do not delete chat anymore. We keep it and block messaging via validity checks.
+      // Optionally, ensure is_active is false in Firebase so both clients see it's inactive.
+      await _database.child('chats/$chatId/is_active').set(false);
     } catch (e) {
       AppLogger.error('Error expiring chat', e);
     }

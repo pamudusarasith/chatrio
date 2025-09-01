@@ -4,6 +4,8 @@ import '../viewmodels/chat_list_view_model.dart';
 import '../models/chat.dart';
 import '../widgets/loading_view_widget.dart';
 import '../widgets/error_view_widget.dart';
+import '../services/user_service.dart';
+import '../services/chat_service.dart';
 
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key, required this.viewModel});
@@ -35,17 +37,12 @@ class ChatListPage extends StatelessWidget {
   }
 
   Widget _buildBody(BuildContext context, ChatListViewModel chatListViewModel) {
-    // Show error state
     if (chatListViewModel.errorMessage != null) {
       return _buildErrorView(context, chatListViewModel);
     }
-
-    // Show loading state
     if (chatListViewModel.isLoading) {
       return _buildLoadingView(context);
     }
-
-    // Show main content
     return _buildChatList(context, chatListViewModel);
   }
 
@@ -79,7 +76,6 @@ class ChatListPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         children: [
-          // Active chats section
           if (chatListViewModel.activeChats.isNotEmpty) ...[
             _buildSectionHeader('Active Chats', Icons.chat_bubble),
             const SizedBox(height: 12),
@@ -88,7 +84,6 @@ class ChatListPage extends StatelessWidget {
             ),
           ],
 
-          // Expired chats section
           if (chatListViewModel.expiredChats.isNotEmpty) ...[
             if (chatListViewModel.activeChats.isNotEmpty)
               const SizedBox(height: 32),
@@ -177,7 +172,116 @@ class ChatListPage extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {
+          onTap: () async {
+            if (isExpired) {
+              // If there's a pending request for this chat, we prefer inline actions; still allow sheet
+              // No-op; we keep bottom sheet for expired chats regardless of pending state
+              // Ask user to delete or request an extension
+              final action = await showModalBottomSheet<String>(
+                context: context,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (ctx) {
+                  return SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 4,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ListTile(
+                          leading: const Icon(Icons.timer_outlined),
+                          title: const Text('Request time extension'),
+                          onTap: () => Navigator.of(ctx).pop('extend'),
+                        ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                          title: const Text(
+                            'Delete chat',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          onTap: () => Navigator.of(ctx).pop('delete'),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  );
+                },
+              );
+
+              if (action == 'delete') {
+                // Confirm delete
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete chat?'),
+                    content: const Text(
+                      'This will remove the chat and its messages from your device.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await chatListViewModel.deleteChat(chat.chatId);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Chat deleted')),
+                    );
+                  }
+                }
+              } else if (action == 'extend') {
+                // Ask how many minutes to extend
+                final minutes = await _pickExtensionMinutes(context);
+                if (minutes != null) {
+                  // Use a light-weight ChatService flow via a temporary view model
+                  final userId = chatListViewModel.currentUserId;
+                  if (userId != null) {
+                    // Defer to ChatService through a simple helper dialog action
+                    final success = await _requestExtension(
+                      context,
+                      chat.chatId,
+                      minutes,
+                    );
+                    if (success && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Extension request sent for $minutes minutes',
+                          ),
+                        ),
+                      );
+                    } else if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to send extension request'),
+                        ),
+                      );
+                    }
+                  }
+                }
+              }
+              return;
+            }
             context.push('/chat/${chat.chatId}');
           },
           child: Padding(
@@ -227,6 +331,7 @@ class ChatListPage extends StatelessWidget {
                               : FontStyle.normal,
                         ),
                       ),
+                      // No inline extension actions
                     ],
                   ),
                 ),
@@ -245,5 +350,65 @@ class ChatListPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+Future<int?> _showNumberPickerDialog(BuildContext context) async {
+  final controller = TextEditingController(text: '10');
+  final result = await showDialog<int>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Extend by (minutes)'),
+      content: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(hintText: 'e.g., 10'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            final v = int.tryParse(controller.text.trim());
+            if (v == null || v <= 0) {
+              Navigator.of(ctx).pop();
+            } else {
+              Navigator.of(ctx).pop(v);
+            }
+          },
+          child: const Text('Send'),
+        ),
+      ],
+    ),
+  );
+  return result;
+}
+
+Future<int?> _pickExtensionMinutes(BuildContext context) async {
+  return _showNumberPickerDialog(context);
+}
+
+Future<bool> _requestExtension(
+  BuildContext context,
+  String chatId,
+  int minutes,
+) async {
+  try {
+    // Acquire ChatService via UserService id already initialized on app
+    // We'll get an instance, or create if not available.
+    final userService = UserService();
+    final user = await userService.getCurrentUser();
+    var chatService = ChatService.instance;
+    if (chatService == null || chatService.userId != user.id) {
+      chatService = ChatService(userId: user.id);
+      await chatService.initialize();
+    }
+    final ok = await chatService.requestChatExtension(chatId, minutes);
+    await chatService.syncChatFromFirebase(chatId);
+    return ok;
+  } catch (_) {
+    return false;
   }
 }

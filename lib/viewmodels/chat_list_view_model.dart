@@ -4,6 +4,7 @@ import '../models/message.dart';
 import '../repositories/chat_repository.dart';
 import '../repositories/message_repository.dart';
 import '../services/user_service.dart';
+import '../services/chat_service.dart';
 
 class ChatListViewModel extends ChangeNotifier {
   final ChatRepository _chatRepository = ChatRepository();
@@ -87,11 +88,22 @@ class ChatListViewModel extends ChangeNotifier {
 
   Future<void> deleteChat(String chatId) async {
     try {
-      await _chatRepository.deleteChat(chatId);
+      if (_currentUserId == null) throw Exception('No current user');
+
+      // Prefer using ChatService to ensure messages are deleted safely
+      var chatService = ChatService.instance;
+      if (chatService == null || chatService.userId != _currentUserId!) {
+        chatService = ChatService(userId: _currentUserId!);
+        // No need to initialize for local delete
+      }
+
+      final ok = await chatService.deleteLocalChat(chatId);
+      if (!ok) throw Exception('Local delete failed');
 
       // Remove from local lists
       _activeChats.removeWhere((chat) => chat.chatId == chatId);
       _expiredChats.removeWhere((chat) => chat.chatId == chatId);
+      _lastMessages.remove(chatId);
 
       notifyListeners();
     } catch (e) {
@@ -161,10 +173,5 @@ class ChatListViewModel extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 }
