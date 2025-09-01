@@ -8,6 +8,8 @@ import '../repositories/message_repository.dart';
 import '../utils/logger.dart';
 
 class ChatService {
+  static ChatService? _instance;
+
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   final ChatRepository _chatRepository = ChatRepository();
   final MessageRepository _messageRepository = MessageRepository();
@@ -23,8 +25,28 @@ class ChatService {
   final StreamController<List<ExtensionRequest>> _extensionRequestController =
       StreamController<List<ExtensionRequest>>.broadcast();
 
-  ChatService({required this.userId}) {
-    _initializeListeners();
+  bool _isInitialized = false;
+
+  ChatService._internal({required this.userId});
+
+  // Singleton factory constructor
+  factory ChatService({required String userId}) {
+    if (_instance == null || _instance!.userId != userId) {
+      _instance?.dispose(); // Dispose previous instance if exists
+      _instance = ChatService._internal(userId: userId);
+    }
+    return _instance!;
+  }
+
+  // Get existing instance (returns null if not initialized)
+  static ChatService? get instance => _instance;
+
+  // Public initialization method
+  Future<void> initialize() async {
+    if (!_isInitialized) {
+      await _initialize();
+      _isInitialized = true;
+    }
   }
 
   // Streams
@@ -34,7 +56,19 @@ class ChatService {
       _extensionRequestController.stream;
 
   // Initialize Firebase listeners
-  void _initializeListeners() {
+  Future<void> _initialize() async {
+    // First, retrieve all pending messages and clear the queue (with timeout)
+    try {
+      await _retrieveAllPendingMessages().timeout(const Duration(seconds: 6));
+    } on TimeoutException {
+      AppLogger.warning(
+        'Pending messages retrieval timed out; starting listeners anyway',
+      );
+    } catch (e, st) {
+      AppLogger.error('Error retrieving pending messages', e, st);
+    }
+
+    // Then start listening for new messages
     _listenToIncomingMessages();
     _listenToExtensionRequests();
   }
@@ -46,9 +80,14 @@ class ChatService {
         .onChildAdded
         .listen((event) async {
           try {
+            final key = event.snapshot.key;
+            final raw = event.snapshot.value;
+            if (key == null || raw == null || raw is! Map) {
+              return; // Ignore malformed entries
+            }
             Message message = Message.fromJson(
-              event.snapshot.key!,
-              Map<String, dynamic>.from(event.snapshot.value as Map),
+              key,
+              Map<String, dynamic>.from(raw),
             );
 
             // Store message locally
@@ -70,6 +109,67 @@ class ChatService {
     getExtensionRequests().listen((requests) {
       _extensionRequestController.add(requests);
     });
+  }
+
+  // Retrieve all pending messages and clear the Firebase queue
+  Future<void> _retrieveAllPendingMessages() async {
+    try {
+      AppLogger.info('Retrieving all pending messages for user: $userId');
+
+      DataSnapshot snapshot = await _database.child('messages/$userId').get();
+
+      if (snapshot.exists) {
+        final raw = snapshot.value;
+        if (raw == null || raw is! Map) {
+          AppLogger.warning('Pending messages payload malformed; skipping');
+          return;
+        }
+        Map<String, dynamic> messagesData = Map<String, dynamic>.from(raw);
+
+        List<Message> messages = [];
+
+        // Process each message
+        for (var entry in messagesData.entries) {
+          try {
+            String messageId = entry.key;
+            if (entry.value is! Map) {
+              continue; // Skip invalid message entry
+            }
+            Map<String, dynamic> messageData = Map<String, dynamic>.from(
+              entry.value,
+            );
+
+            Message message = Message.fromJson(messageId, messageData);
+            messages.add(message);
+
+            // Store message locally
+            await _messageRepository.insertMessage(message);
+
+            AppLogger.info(
+              'Retrieved message: ${message.messageId} from ${message.sender}',
+            );
+          } catch (e) {
+            AppLogger.error('Error processing message ${entry.key}', e);
+          }
+        }
+
+        // Clear all messages from Firebase after successful retrieval
+        await _database.child('messages/$userId').remove();
+
+        // Emit all messages to the stream
+        for (Message message in messages) {
+          _messageController.add(message);
+        }
+
+        AppLogger.info(
+          'Successfully retrieved and cleared ${messages.length} pending messages',
+        );
+      } else {
+        AppLogger.info('No pending messages found for user: $userId');
+      }
+    } catch (e) {
+      AppLogger.error('Error retrieving pending messages', e);
+    }
   }
 
   // Send message (only if chat is valid)
@@ -142,7 +242,8 @@ class ChatService {
         Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!chat.isParticipant(userId) || !chat.isActive) return false;
+      // Allow requesting extension if participant, regardless of active flag.
+      if (!chat.isParticipant(userId)) return false;
 
       // Create extension request
       await _database.child('extension_requests/$chatId').set({
@@ -174,7 +275,8 @@ class ChatService {
         Map<String, dynamic>.from(chatSnapshot.value as Map),
       );
 
-      if (!chat.isParticipant(userId) || !chat.isActive) return false;
+      // Allow responding if participant, regardless of active flag.
+      if (!chat.isParticipant(userId)) return false;
 
       DataSnapshot requestSnapshot = await _database
           .child('extension_requests/$chatId')
@@ -209,6 +311,9 @@ class ChatService {
             .child('chats/$chatId/expires_at')
             .set(newExpirationTime);
 
+        // Ensure chat is marked active again upon extension approval
+        await _database.child('chats/$chatId/is_active').set(true);
+
         // Update request status
         await _database
             .child('extension_requests/$chatId/status')
@@ -217,6 +322,9 @@ class ChatService {
         await _database
             .child('extension_requests/$chatId/approved_at')
             .set(DateTime.now().millisecondsSinceEpoch);
+
+        // Sync local chat with updated state
+        await syncChatFromFirebase(chatId);
 
         // Clean up request after short delay
         Future.delayed(Duration(seconds: 30), () {
@@ -231,6 +339,9 @@ class ChatService {
         await _database
             .child('extension_requests/$chatId/rejected_at')
             .set(DateTime.now().millisecondsSinceEpoch);
+
+        // Sync local chat (no change to chat in this branch but keep parity)
+        await syncChatFromFirebase(chatId);
 
         // Clean up request after short delay
         Future.delayed(Duration(seconds: 30), () {
@@ -330,6 +441,44 @@ class ChatService {
   // Get chat nickname
   Future<String?> getChatNickname(String chatId) async {
     return await _chatRepository.getChatNickname(chatId);
+  }
+
+  // Delete a chat locally (and its messages)
+  Future<bool> deleteLocalChat(String chatId) async {
+    try {
+      // Delete messages first for safety (SQLite FKs may not be enforced)
+      await _messageRepository.deleteChatMessages(chatId);
+      await _chatRepository.deleteChat(chatId);
+      return true;
+    } catch (e) {
+      AppLogger.error('Error deleting local chat', e);
+      return false;
+    }
+  }
+
+  // Sync a chat from Firebase into local database
+  Future<bool> syncChatFromFirebase(String chatId) async {
+    try {
+      final snap = await _database.child('chats/$chatId').get();
+      if (!snap.exists) return false;
+      final chat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(snap.value as Map),
+      );
+      if (!chat.isParticipant(userId)) return false;
+
+      final existing = await _chatRepository.getChat(chatId);
+      if (existing == null) {
+        await _chatRepository.insertChat(chat);
+      } else {
+        await _chatRepository.updateChat(chat);
+        await _chatRepository.setChatNickname(chatId, existing.nickname!);
+      }
+      return true;
+    } catch (e) {
+      AppLogger.error('Error syncing chat from Firebase', e);
+      return false;
+    }
   }
 
   // Save chat locally with nickname
@@ -447,8 +596,9 @@ class ChatService {
 
   Future<void> _expireChat(String chatId) async {
     try {
-      await _database.child('chats/$chatId').remove();
-      await _chatRepository.deleteChat(chatId);
+      // Do not delete chat anymore. We keep it and block messaging via validity checks.
+      // Optionally, ensure is_active is false in Firebase so both clients see it's inactive.
+      await _database.child('chats/$chatId/is_active').set(false);
     } catch (e) {
       AppLogger.error('Error expiring chat', e);
     }

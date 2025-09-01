@@ -51,8 +51,12 @@ class GenerateQRViewModel extends ChangeNotifier {
       User currentUser = await _userService.getCurrentUser();
       _currentUserId = currentUser.id;
 
-      // Initialize chat service
-      _chatService = ChatService(userId: _currentUserId!);
+      // Use the singleton ChatService instance or create/initialize it
+      _chatService = ChatService.instance;
+      if (_chatService == null || _chatService!.userId != _currentUserId!) {
+        _chatService = ChatService(userId: _currentUserId!);
+        await _chatService!.initialize();
+      }
 
       // Always generate a new chat ID on initialization
       _generateNewChatId();

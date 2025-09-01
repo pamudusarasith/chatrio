@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../router.dart';
 import '../viewmodels/home_view_model.dart';
-import '../widgets/loading_view_widget.dart';
+import '../widgets/splash_view_widget.dart';
 import '../widgets/error_view_widget.dart';
 
 class HomePage extends StatelessWidget {
@@ -39,7 +39,7 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildLoadingView(BuildContext context) {
-    return const LoadingViewWidget(message: "Initializing Chatrio...");
+    return const SplashViewWidget();
   }
 
   Widget _buildErrorView(BuildContext context, HomeViewModel homeViewModel) {

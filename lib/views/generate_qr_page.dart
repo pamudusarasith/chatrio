@@ -83,7 +83,7 @@ class GenerateQRPage extends StatelessWidget {
                       bool success = await viewModel.startChatting(nickname);
                       if (success && context.mounted) {
                         // Navigate to home or chat list
-                        context.go('/');
+                        context.go('/chat/${viewModel.currentChatId}');
                       }
                     }
                   },
