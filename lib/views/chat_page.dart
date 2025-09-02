@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../viewmodels/chat_page_view_model.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
+import '../widgets/nickname_dialog.dart';
+
+enum _ChatMenuAction { changeNickname, deleteChat }
 
 class ChatPage extends StatelessWidget {
   final ChatPageViewModel viewModel;
@@ -16,47 +19,79 @@ class ChatPage extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.grey[800],
-        title: Text(
-          viewModel.getChatDisplayName(),
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+        title: ListenableBuilder(
+          listenable: viewModel,
+          builder: (context, _) => Text(
+            viewModel.getChatDisplayName(),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+          ),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Delete chat',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Delete chat?'),
-                  content: const Text(
-                    'This will remove the chat and its messages from your device.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      child: const Text('Delete'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirm == true) {
-                final ok = await viewModel.deleteChat();
-                if (!context.mounted) return;
-                if (ok) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Chat deleted')));
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to delete chat')),
+          PopupMenuButton<_ChatMenuAction>(
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _ChatMenuAction.changeNickname,
+                child: Text('Change nickname'),
+              ),
+              PopupMenuItem(
+                value: _ChatMenuAction.deleteChat,
+                child: Text('Delete chat'),
+              ),
+            ],
+            onSelected: (action) async {
+              switch (action) {
+                case _ChatMenuAction.changeNickname:
+                  final newName = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => const NicknameDialog(),
                   );
-                }
+                  if (newName != null && newName.trim().isNotEmpty) {
+                    final ok = await viewModel.changeNickname(newName.trim());
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok ? 'Nickname updated' : 'Failed to update nickname',
+                        ),
+                      ),
+                    );
+                  }
+                  break;
+                case _ChatMenuAction.deleteChat:
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete chat?'),
+                      content: const Text(
+                        'This will remove the chat and its messages from your device.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    final ok = await viewModel.deleteChat();
+                    if (!context.mounted) return;
+                    if (ok) {
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Chat deleted')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to delete chat')),
+                      );
+                    }
+                  }
+                  break;
               }
             },
           ),

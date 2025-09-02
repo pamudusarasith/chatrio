@@ -19,12 +19,6 @@ class ChatListPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Chats'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => viewModel.refreshChats(),
-          ),
-        ],
       ),
       body: SafeArea(
         child: ListenableBuilder(
