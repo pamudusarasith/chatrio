@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../viewmodels/chat_list_view_model.dart';
 import '../models/chat.dart';
 import '../widgets/loading_view_widget.dart';
+import '../models/extension_request.dart';
 import '../widgets/error_view_widget.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
@@ -67,7 +68,9 @@ class ChatListPage extends StatelessWidget {
     BuildContext context,
     ChatListViewModel chatListViewModel,
   ) {
-    if (!chatListViewModel.hasChats) {
+    if (!chatListViewModel.hasChats &&
+        chatListViewModel.incomingRequests.isEmpty &&
+        chatListViewModel.myPendingRequests.isEmpty) {
       return _buildEmptyState(context);
     }
 
@@ -76,6 +79,22 @@ class ChatListPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         children: [
+          if (chatListViewModel.myPendingRequests.isNotEmpty) ...[
+            _buildSectionHeader('Waiting for Approval', Icons.hourglass_top),
+            const SizedBox(height: 12),
+            ...chatListViewModel.myPendingRequests.map(
+              (req) => _buildWaitingTile(context, chatListViewModel, req),
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (chatListViewModel.incomingRequests.isNotEmpty) ...[
+            _buildSectionHeader('Requests', Icons.timer_outlined),
+            const SizedBox(height: 12),
+            ...chatListViewModel.incomingRequests.map(
+              (req) => _buildExtensionTile(context, chatListViewModel, req),
+            ),
+            const SizedBox(height: 20),
+          ],
           if (chatListViewModel.activeChats.isNotEmpty) ...[
             _buildSectionHeader('Active Chats', Icons.chat_bubble),
             const SizedBox(height: 12),
@@ -94,6 +113,142 @@ class ChatListPage extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildWaitingTile(
+    BuildContext context,
+    ChatListViewModel vm,
+    ExtensionRequest req,
+  ) {
+    final chat = (vm.activeChats + vm.expiredChats).firstWhere(
+      (c) => c.chatId == req.chatId,
+      orElse: () => Chat(
+        chatId: req.chatId,
+        creator: '',
+        joiner: '',
+        createdAt: 0,
+        expiresAt: 0,
+        isActive: false,
+      ),
+    );
+    final name = vm.getChatDisplayName(chat);
+    final minutes = req.additionalMinutes;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(Icons.hourglass_top, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Waiting for "$name" to approve +$minutes min',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExtensionTile(
+    BuildContext context,
+    ChatListViewModel vm,
+    ExtensionRequest req,
+  ) {
+    final chat = (vm.activeChats + vm.expiredChats).firstWhere(
+      (c) => c.chatId == req.chatId,
+      orElse: () => Chat(
+        chatId: req.chatId,
+        creator: '',
+        joiner: '',
+        createdAt: 0,
+        expiresAt: 0,
+        isActive: false,
+      ),
+    );
+    final name = vm.getChatDisplayName(chat);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.timer_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Extend "$name" by ${req.additionalMinutes} minutes?',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final ok = await vm.rejectExtension(req.chatId);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok ? 'Request rejected' : 'Failed to reject',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.close),
+                    label: const Text('Reject'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final ok = await vm.approveExtension(req.chatId);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok ? 'Extension approved' : 'Failed to approve',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.check),
+                    label: const Text('Approve'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

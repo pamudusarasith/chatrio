@@ -246,6 +246,143 @@ class ChatService {
     }
   }
 
+  // Respond to chat extension request
+  Future<bool> respondToExtensionRequest(String chatId, bool approve) async {
+    try {
+      DataSnapshot chatSnapshot = await _database.child('chats/$chatId').get();
+      if (!chatSnapshot.exists) return false;
+
+      Chat chat = Chat.fromJson(
+        chatId,
+        Map<String, dynamic>.from(chatSnapshot.value as Map),
+      );
+
+      if (!chat.isParticipant(userId)) return false;
+
+      final reqSnap = await _database.child('extension_requests/$chatId').get();
+      if (!reqSnap.exists) return false;
+      final request = Map<String, dynamic>.from(reqSnap.value as Map);
+
+      // Only allow if still pending and not expired and requester is other user
+      if (request['status'] != 'pending') return false;
+      if (request['requester'] == userId) return false;
+      if (DateTime.now().millisecondsSinceEpoch >
+          (request['expires_at'] as int)) {
+        await _database.child('extension_requests/$chatId').remove();
+        return false;
+      }
+
+      if (approve) {
+        final additionalMinutes = request['additional_minutes'] as int;
+        final newExpirationTime = DateTime.now()
+            .add(Duration(minutes: additionalMinutes))
+            .millisecondsSinceEpoch;
+        await _database
+            .child('chats/$chatId/expires_at')
+            .set(newExpirationTime);
+        await _database.child('chats/$chatId/is_active').set(true);
+        await _database
+            .child('extension_requests/$chatId/status')
+            .set('approved');
+        await _database
+            .child('extension_requests/$chatId/approved_at')
+            .set(DateTime.now().millisecondsSinceEpoch);
+        await syncChatFromFirebase(chatId);
+        // Cleanup soon after
+        Future.delayed(const Duration(seconds: 30), () {
+          _database.child('extension_requests/$chatId').remove();
+        });
+      } else {
+        await _database
+            .child('extension_requests/$chatId/status')
+            .set('rejected');
+        await _database
+            .child('extension_requests/$chatId/rejected_at')
+            .set(DateTime.now().millisecondsSinceEpoch);
+        await syncChatFromFirebase(chatId);
+        Future.delayed(const Duration(seconds: 30), () {
+          _database.child('extension_requests/$chatId').remove();
+        });
+      }
+
+      return true;
+    } catch (e) {
+      AppLogger.error('Error responding to extension request', e);
+      return false;
+    }
+  }
+
+  // Stream pending extension requests for all chats where user participates
+  Stream<List<Map<String, dynamic>>> getExtensionRequests() {
+    return _database.child('extension_requests').onValue.asyncMap((
+      event,
+    ) async {
+      if (!event.snapshot.exists) return <Map<String, dynamic>>[];
+      final all = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final List<Map<String, dynamic>> result = [];
+      for (final entry in all.entries) {
+        final chatId = entry.key;
+        final raw = entry.value;
+        if (raw is! Map) continue;
+        final req = Map<String, dynamic>.from(raw);
+        // Ensure request still pending and not expired and requester is other user
+        if (req['status'] != 'pending') continue;
+        if (req['requester'] == userId) continue;
+        final expiresAt = req['expires_at'] as int?;
+        if (expiresAt != null &&
+            DateTime.now().millisecondsSinceEpoch > expiresAt) {
+          continue;
+        }
+
+        // Verify user participates in the chat
+        final chatSnap = await _database.child('chats/$chatId').get();
+        if (!chatSnap.exists) continue;
+        final chat = Chat.fromJson(
+          chatId,
+          Map<String, dynamic>.from(chatSnap.value as Map),
+        );
+        if (!chat.isParticipant(userId)) continue;
+
+        result.add({'chatId': chatId, ...req});
+      }
+      return result;
+    });
+  }
+
+  // Stream current user's own pending extension requests
+  Stream<List<Map<String, dynamic>>> getMyExtensionRequests() {
+    return _database.child('extension_requests').onValue.asyncMap((
+      event,
+    ) async {
+      if (!event.snapshot.exists) return <Map<String, dynamic>>[];
+      final all = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final List<Map<String, dynamic>> result = [];
+      for (final entry in all.entries) {
+        final chatId = entry.key;
+        final raw = entry.value;
+        if (raw is! Map) continue;
+        final req = Map<String, dynamic>.from(raw);
+        if (req['status'] != 'pending') continue;
+        if (req['requester'] != userId) continue;
+        final expiresAt = req['expires_at'] as int?;
+        if (expiresAt != null &&
+            DateTime.now().millisecondsSinceEpoch > expiresAt) {
+          continue;
+        }
+        // Verify chat still exists and user participates
+        final chatSnap = await _database.child('chats/$chatId').get();
+        if (!chatSnap.exists) continue;
+        final chat = Chat.fromJson(
+          chatId,
+          Map<String, dynamic>.from(chatSnap.value as Map),
+        );
+        if (!chat.isParticipant(userId)) continue;
+        result.add({'chatId': chatId, ...req});
+      }
+      return result;
+    });
+  }
+
   // Get local chat data
   Future<Chat?> getChat(String chatId) async {
     return await _chatRepository.getChat(chatId);
@@ -301,7 +438,7 @@ class ChatService {
         await _chatRepository.insertChat(chat);
       } else {
         await _chatRepository.updateChat(chat);
-        // Preserve existing nickname if present
+        // Preserve existing nickname if present; no-op if null/empty
         final nick = existing.nickname;
         if (nick != null && nick.isNotEmpty) {
           await _chatRepository.setChatNickname(chatId, nick);
