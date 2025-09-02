@@ -368,6 +368,7 @@ class ChatListPage extends StatelessWidget {
                   );
                 },
               );
+              if (!context.mounted) return;
 
               if (action == 'delete') {
                 // Confirm delete
@@ -390,6 +391,7 @@ class ChatListPage extends StatelessWidget {
                     ],
                   ),
                 );
+                if (!context.mounted) return;
                 if (confirm == true) {
                   await chatListViewModel.deleteChat(chat.chatId);
                   if (context.mounted) {
@@ -401,6 +403,7 @@ class ChatListPage extends StatelessWidget {
               } else if (action == 'extend') {
                 // Ask how many minutes to extend
                 final minutes = await _pickExtensionMinutes(context);
+                if (!context.mounted) return;
                 if (minutes != null) {
                   // Use a light-weight ChatService flow via a temporary view model
                   final userId = chatListViewModel.currentUserId;

@@ -131,6 +131,7 @@ class ChatPage extends StatelessWidget {
                       TextButton(
                         onPressed: () async {
                           final minutes = await _pickExtensionMinutes(context);
+                          if (!context.mounted) return;
                           if (minutes != null) {
                             final success = await _requestExtension(
                               context,
@@ -173,6 +174,7 @@ class ChatPage extends StatelessWidget {
                               ],
                             ),
                           );
+                          if (!context.mounted) return;
                           if (confirm == true && context.mounted) {
                             final ok = await viewModel.deleteChat();
                             if (!context.mounted) return;
@@ -254,6 +256,7 @@ class ChatPage extends StatelessWidget {
                                   final minutes = await _pickExtensionMinutes(
                                     context,
                                   );
+                                  if (!context.mounted) return;
                                   if (minutes != null) {
                                     final success = await _requestExtension(
                                       context,
@@ -301,6 +304,7 @@ class ChatPage extends StatelessWidget {
                                       ],
                                     ),
                                   );
+                                  if (!context.mounted) return;
                                   if (confirm == true && context.mounted) {
                                     final ok = await viewModel.deleteChat();
                                     if (!context.mounted) return;
@@ -426,7 +430,9 @@ class ChatPage extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: isMe
-                                            ? Colors.white.withOpacity(0.7)
+                                            ? Colors.white.withValues(
+                                                alpha: 0.7,
+                                              )
                                             : Colors.grey[500],
                                       ),
                                     ),
