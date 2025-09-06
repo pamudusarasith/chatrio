@@ -51,6 +51,8 @@ class GenerateQRPage extends StatelessWidget {
           child: ListenableBuilder(
             listenable: viewModel,
             builder: (context, child) {
+              final theme = Theme.of(context);
+              final cs = theme.colorScheme;
               if (viewModel.isLoading) {
                 return const LoadingViewWidget(
                   message: 'Generating QR Code...',
@@ -105,11 +107,11 @@ class GenerateQRPage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF15d1cb),
+                      color: cs.primary,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color.fromARGB(255, 157, 226, 223),
+                          color: cs.shadow.withValues(alpha: 0.12),
                           blurRadius: 18,
                           spreadRadius: 4,
                           offset: const Offset(0, 0),
@@ -119,13 +121,13 @@ class GenerateQRPage extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color.fromARGB(255, 247, 248, 250),
+                        color: cs.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cs.surface,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: QrImageView(
@@ -147,9 +149,9 @@ class GenerateQRPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 25),
 
-                  const Text(
+                  Text(
                     "Ask your friend to scan this QR code",
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
 
                   const SizedBox(height: 30),
@@ -166,17 +168,17 @@ class GenerateQRPage extends StatelessWidget {
                         );
                       }
                     },
-                    icon: const Icon(Icons.refresh, color: Colors.white),
-                    label: const Text(
+                    icon: Icon(Icons.refresh, color: cs.onPrimary),
+                    label: Text(
                       "New Session",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: cs.onPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF19c8d1),
+                      backgroundColor: cs.primary,
                       padding: const EdgeInsets.symmetric(
                         vertical: 12,
                         horizontal: 34,

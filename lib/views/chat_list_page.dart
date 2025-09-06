@@ -7,6 +7,7 @@ import '../models/extension_request.dart';
 import '../widgets/error_view_widget.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
+import '../utils/logger.dart';
 
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key, required this.viewModel});
@@ -16,10 +17,7 @@ class ChatListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chats'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
+      appBar: AppBar(title: const Text('Chats')),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: viewModel,
@@ -116,6 +114,7 @@ class ChatListPage extends StatelessWidget {
     ChatListViewModel vm,
     ExtensionRequest req,
   ) {
+    final cs = Theme.of(context).colorScheme;
     final chat = (vm.activeChats + vm.expiredChats).firstWhere(
       (c) => c.chatId == req.chatId,
       orElse: () => Chat(
@@ -132,22 +131,23 @@ class ChatListPage extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
+        border: Border.all(color: cs.outlineVariant, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            const Icon(Icons.hourglass_top, size: 20),
+            Icon(Icons.hourglass_top, size: 20, color: cs.primary),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Waiting for "$name" to approve +$minutes min',
-                style: const TextStyle(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
                 ),
               ),
             ),
@@ -162,6 +162,7 @@ class ChatListPage extends StatelessWidget {
     ChatListViewModel vm,
     ExtensionRequest req,
   ) {
+    final cs = Theme.of(context).colorScheme;
     final chat = (vm.activeChats + vm.expiredChats).firstWhere(
       (c) => c.chatId == req.chatId,
       orElse: () => Chat(
@@ -177,9 +178,9 @@ class ChatListPage extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
+        border: Border.all(color: cs.outlineVariant, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -188,14 +189,15 @@ class ChatListPage extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.timer_outlined, size: 20),
+                Icon(Icons.timer_outlined, size: 20, color: cs.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Extend "$name" by ${req.additionalMinutes} minutes?',
-                    style: const TextStyle(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
                     ),
                   ),
                 ),
@@ -248,24 +250,29 @@ class ChatListPage extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 64,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
           const SizedBox(height: 16),
           Text(
             'No chats yet',
             style: Theme.of(
               context,
-            ).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]),
+            ).textTheme.headlineSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
           Text(
             'Start a new chat by generating or scanning a QR code',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.9),
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -274,23 +281,29 @@ class ChatListPage extends StatelessWidget {
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.grey[600]),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-              letterSpacing: 0.3,
-            ),
+    // Use subtle onSurfaceVariant for section headers
+    return Builder(
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -300,6 +313,7 @@ class ChatListPage extends StatelessWidget {
     ChatListViewModel chatListViewModel,
     bool isExpired,
   ) {
+    final cs = Theme.of(context).colorScheme;
     final displayName = chatListViewModel.getChatDisplayName(chat);
     final lastMessage = chatListViewModel.getLastMessage(chat.chatId);
     final lastMessageText = lastMessage?.text ?? 'No messages yet';
@@ -310,12 +324,9 @@ class ChatListPage extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isExpired ? Colors.grey[300]! : Colors.grey[200]!,
-          width: 1,
-        ),
+        border: Border.all(color: cs.outlineVariant, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -332,6 +343,7 @@ class ChatListPage extends StatelessWidget {
                   borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 builder: (ctx) {
+                  final cs = Theme.of(ctx).colorScheme;
                   return SafeArea(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -341,24 +353,24 @@ class ChatListPage extends StatelessWidget {
                           height: 4,
                           width: 40,
                           decoration: BoxDecoration(
-                            color: Colors.grey[300],
+                            color: cs.outlineVariant,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                         const SizedBox(height: 12),
                         ListTile(
-                          leading: const Icon(Icons.timer_outlined),
+                          leading: Icon(
+                            Icons.timer_outlined,
+                            color: cs.primary,
+                          ),
                           title: const Text('Request time extension'),
                           onTap: () => Navigator.of(ctx).pop('extend'),
                         ),
                         ListTile(
-                          leading: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                          title: const Text(
+                          leading: Icon(Icons.delete_outline, color: cs.error),
+                          title: Text(
                             'Delete chat',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(color: cs.error),
                           ),
                           onTap: () => Navigator.of(ctx).pop('delete'),
                         ),
@@ -386,7 +398,10 @@ class ChatListPage extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(true),
-                        child: const Text('Delete'),
+                        child: Text(
+                          'Delete',
+                          style: TextStyle(color: cs.error),
+                        ),
                       ),
                     ],
                   ),
@@ -434,7 +449,7 @@ class ChatListPage extends StatelessWidget {
               }
               return;
             }
-            context.push('/chat/${chat.chatId}');
+            context.go('/chat/${chat.chatId}');
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -445,13 +460,15 @@ class ChatListPage extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     color: isExpired
-                        ? Colors.grey[400]
-                        : Theme.of(context).primaryColor,
+                        ? cs.surfaceContainerHighest
+                        : cs.primaryContainer,
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Icon(
                     Icons.chat_bubble_outline,
-                    color: Colors.white,
+                    color: isExpired
+                        ? cs.onSurfaceVariant
+                        : cs.onPrimaryContainer,
                     size: 24,
                   ),
                 ),
@@ -462,22 +479,21 @@ class ChatListPage extends StatelessWidget {
                     children: [
                       Text(
                         displayName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: isExpired
-                              ? Colors.grey[600]
-                              : Colors.grey[900],
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: isExpired
+                                  ? cs.onSurfaceVariant
+                                  : cs.onSurface,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         lastMessageText,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
                           fontStyle: lastMessage == null
                               ? FontStyle.italic
                               : FontStyle.normal,
@@ -490,9 +506,8 @@ class ChatListPage extends StatelessWidget {
                 if (lastMessageTime.isNotEmpty)
                   Text(
                     lastMessageTime,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -548,8 +563,6 @@ Future<bool> _requestExtension(
   int minutes,
 ) async {
   try {
-    // Acquire ChatService via UserService id already initialized on app
-    // We'll get an instance, or create if not available.
     final userService = UserService();
     final user = await userService.getCurrentUser();
     var chatService = ChatService.instance;
@@ -557,10 +570,21 @@ Future<bool> _requestExtension(
       chatService = ChatService(userId: user.id);
       await chatService.initialize();
     }
+    AppLogger.info(
+      'Requesting chat extension: chatId=$chatId, userId=${user.id}, minutes=$minutes',
+    );
     final ok = await chatService.requestChatExtension(chatId, minutes);
+    AppLogger.info(
+      'Chat extension request result: chatId=$chatId, success=$ok',
+    );
     await chatService.syncChatFromFirebase(chatId);
     return ok;
-  } catch (_) {
+  } catch (e, stack) {
+    AppLogger.error(
+      'Error requesting chat extension: chatId=$chatId, error=${e.toString()}',
+      e,
+      stack,
+    );
     return false;
   }
 }

@@ -70,7 +70,6 @@ class ScanQrPage extends StatelessWidget {
                   // Save chat with nickname
                   bool success = await viewModel.startChatting(nickname);
                   if (success && context.mounted) {
-                    // Navigate to home or chat list
                     context.go('/chat/${viewModel.chatId}');
                   }
                 }
@@ -97,13 +96,14 @@ class ScanQrPage extends StatelessWidget {
           }
 
           // Default scanner view
-          return _buildScannerView();
+          return _buildScannerView(context);
         },
       ),
     );
   }
 
-  Widget _buildScannerView() {
+  Widget _buildScannerView(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Stack(
       children: [
         // Camera view
@@ -117,7 +117,7 @@ class ScanQrPage extends StatelessWidget {
             width: 250,
             height: 250,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.cyan, width: 4),
+              border: Border.all(color: cs.primary, width: 4),
               borderRadius: BorderRadius.circular(24),
             ),
           ),
@@ -139,10 +139,10 @@ class ScanQrPage extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Text(
+                child: Text(
                   "Point your camera at your friend's QR code to connect",
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                  style: TextStyle(color: cs.onSurface, fontSize: 16),
                 ),
               ),
             ],

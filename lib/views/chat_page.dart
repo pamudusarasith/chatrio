@@ -3,6 +3,7 @@ import '../viewmodels/chat_page_view_model.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 import '../widgets/nickname_dialog.dart';
+import '../utils/logger.dart';
 
 enum _ChatMenuAction { changeNickname, deleteChat }
 
@@ -13,12 +14,13 @@ class ChatPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: cs.surface,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.grey[800],
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         title: ListenableBuilder(
           listenable: viewModel,
           builder: (context, _) => Text(
@@ -98,7 +100,7 @@ class ChatPage extends StatelessWidget {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Colors.grey[200]),
+          child: Container(height: 1, color: cs.outlineVariant),
         ),
       ),
       body: SafeArea(
@@ -117,15 +119,15 @@ class ChatPage extends StatelessWidget {
                     horizontal: 12,
                     vertical: 10,
                   ),
-                  color: Colors.amber[100],
+                  color: cs.surfaceContainerHigh,
                   child: Row(
                     children: [
-                      const Icon(Icons.lock_clock, size: 18),
+                      Icon(Icons.lock_clock, size: 18, color: cs.primary),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'This chat has expired. You can delete it or request an extension.',
-                          style: TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: 13, color: cs.onSurface),
                         ),
                       ),
                       TextButton(
@@ -169,7 +171,10 @@ class ChatPage extends StatelessWidget {
                                 ),
                                 TextButton(
                                   onPressed: () => Navigator.of(ctx).pop(true),
-                                  child: const Text('Delete'),
+                                  child: Text(
+                                    'Delete',
+                                    style: TextStyle(color: cs.error),
+                                  ),
                                 ),
                               ],
                             ),
@@ -220,14 +225,14 @@ class ChatPage extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: Colors.amber[50],
+                              color: cs.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(50),
-                              border: Border.all(color: Colors.amber[200]!),
+                              border: Border.all(color: cs.outlineVariant),
                             ),
                             child: Icon(
                               Icons.lock_clock,
                               size: 48,
-                              color: Colors.amber[700],
+                              color: cs.primary,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -235,7 +240,7 @@ class ChatPage extends StatelessWidget {
                             'Chat expired',
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.grey[800],
+                              color: cs.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -244,7 +249,7 @@ class ChatPage extends StatelessWidget {
                             'Request an extension or delete the chat.',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.grey[600],
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -299,7 +304,10 @@ class ChatPage extends StatelessWidget {
                                         TextButton(
                                           onPressed: () =>
                                               Navigator.of(ctx).pop(true),
-                                          child: const Text('Delete'),
+                                          child: Text(
+                                            'Delete',
+                                            style: TextStyle(color: cs.error),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -347,13 +355,13 @@ class ChatPage extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: Colors.grey[200],
+                              color: cs.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(50),
                             ),
                             child: Icon(
                               Icons.chat_bubble_outline,
                               size: 48,
-                              color: Colors.grey[500],
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -361,7 +369,7 @@ class ChatPage extends StatelessWidget {
                             'No messages yet',
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.grey[600],
+                              color: cs.onSurfaceVariant,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -370,7 +378,7 @@ class ChatPage extends StatelessWidget {
                             'Start the conversation!',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.grey[500],
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -400,13 +408,13 @@ class ChatPage extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isMe
-                                      ? Theme.of(context).primaryColor
-                                      : Colors.white,
+                                      ? cs.primaryContainer
+                                      : cs.surface,
                                   borderRadius: BorderRadius.circular(20),
                                   border: isMe
                                       ? null
                                       : Border.all(
-                                          color: Colors.grey[300]!,
+                                          color: cs.outlineVariant,
                                           width: 1,
                                         ),
                                 ),
@@ -417,8 +425,8 @@ class ChatPage extends StatelessWidget {
                                       message.text,
                                       style: TextStyle(
                                         color: isMe
-                                            ? Colors.white
-                                            : Colors.grey[800],
+                                            ? cs.onPrimaryContainer
+                                            : cs.onSurface,
                                         fontSize: 16,
                                       ),
                                     ),
@@ -430,10 +438,10 @@ class ChatPage extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: isMe
-                                            ? Colors.white.withValues(
+                                            ? cs.onPrimaryContainer.withValues(
                                                 alpha: 0.7,
                                               )
-                                            : Colors.grey[500],
+                                            : cs.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -456,14 +464,15 @@ class ChatPage extends StatelessWidget {
   }
 
   Widget _buildMessageInput(BuildContext context, ChatPageViewModel viewModel) {
+    final cs = Theme.of(context).colorScheme;
     final controller = viewModel.messageController;
     final expired =
         (viewModel.chat?.isExpired() == true) ||
         !(viewModel.chat?.isActive ?? true);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant, width: 1)),
       ),
       child: SafeArea(
         child: Padding(
@@ -473,7 +482,7 @@ class ChatPage extends StatelessWidget {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: cs.surfaceContainerLowest,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: ListenableBuilder(
@@ -507,9 +516,7 @@ class ChatPage extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: expired
-                      ? Colors.grey[300]
-                      : Theme.of(context).primaryColor,
+                  color: expired ? cs.surfaceContainerHigh : cs.primary,
                   borderRadius: BorderRadius.circular(22),
                 ),
                 child: ListenableBuilder(
@@ -517,17 +524,19 @@ class ChatPage extends StatelessWidget {
                   builder: (context, child) {
                     return IconButton(
                       icon: viewModel.isSending
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
+                                color: cs.onPrimary,
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Icon(
+                          : Icon(
                               Icons.send,
-                              color: Colors.white,
+                              color: expired
+                                  ? cs.onSurfaceVariant
+                                  : cs.onPrimary,
                               size: 20,
                             ),
                       onPressed: viewModel.isSending || expired
@@ -591,11 +600,22 @@ Future<bool> _requestExtension(
       chatService = ChatService(userId: user.id);
       await chatService.initialize();
     }
+    AppLogger.info(
+      'Requesting chat extension: chatId=$chatId, userId=${user.id}, minutes=$minutes',
+    );
     final ok = await chatService.requestChatExtension(chatId, minutes);
+    AppLogger.info(
+      'Chat extension request result: chatId=$chatId, success=$ok',
+    );
     // Try to refresh local chat after request (approval may come later via listener)
     await chatService.syncChatFromFirebase(chatId);
     return ok;
-  } catch (_) {
+  } catch (e, stack) {
+    AppLogger.error(
+      'Error requesting chat extension: chatId=$chatId, error=${e.toString()}',
+      e,
+      stack,
+    );
     return false;
   }
 }

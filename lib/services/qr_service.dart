@@ -12,7 +12,7 @@ class QRService {
       'chat_id': chatId,
       'created_at': DateTime.now().millisecondsSinceEpoch,
       'expires_at': DateTime.now()
-          .add(Duration(minutes: 60))
+          .add(Duration(minutes: 2))
           .millisecondsSinceEpoch,
     };
 

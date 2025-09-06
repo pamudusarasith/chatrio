@@ -44,7 +44,13 @@ GoRouter get router {
         path: '/chats',
         builder: (context, state) {
           final chatListViewModel = ChatListViewModel();
-          return ChatListPage(viewModel: chatListViewModel);
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) {
+              context.go('/');
+            },
+            child: ChatListPage(viewModel: chatListViewModel),
+          );
         },
       ),
       GoRoute(
@@ -52,7 +58,16 @@ GoRouter get router {
         builder: (context, state) {
           final chatId = state.pathParameters['chatId'] ?? '';
           final viewModel = ChatPageViewModel(chatId: chatId);
-          return ChatPage(viewModel: viewModel);
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) => {
+              if (context.canPop())
+                {context.pop()}
+              else
+                {context.navigate('/chats')},
+            },
+            child: ChatPage(viewModel: viewModel),
+          );
         },
       ),
     ],
