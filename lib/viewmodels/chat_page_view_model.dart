@@ -119,6 +119,19 @@ class ChatPageViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> changeNickname(String nickname) async {
+    try {
+      if (_chatService == null) return false;
+      final ok = await _chatService!.setChatNickname(chatId, nickname);
+      if (ok) {
+        await _loadChat();
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _setupMessageListener() {
     if (_chatService == null) return;
 

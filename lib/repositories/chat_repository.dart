@@ -53,9 +53,16 @@ class ChatRepository {
   // Update chat
   Future<int> updateChat(Chat chat) async {
     final db = await _dbManager.database;
+    final data = Map<String, dynamic>.from(chat.toMap());
+    // Never overwrite local nickname when syncing from remote unless explicitly set
+    if (chat.nickname == null) {
+      data.remove('nickname');
+    }
+    // Do not attempt to update the primary key value
+    data.remove('chat_id');
     return await db.update(
       'chats',
-      chat.toMap(),
+      data,
       where: 'chat_id = ?',
       whereArgs: [chat.chatId],
     );

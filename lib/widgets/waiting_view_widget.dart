@@ -54,11 +54,9 @@ class WaitingViewWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colorScheme.surface,
+                color: colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colorScheme.primary.withValues(alpha: 0.3),
-                ),
+                border: Border.all(color: colorScheme.outlineVariant),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -73,7 +71,7 @@ class WaitingViewWidget extends StatelessWidget {
                     child: Text(
                       infoText,
                       style: TextStyle(
-                        color: colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 14,
                       ),
                     ),

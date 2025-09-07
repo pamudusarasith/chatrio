@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers.dart';
 import 'router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(MultiProvider(providers: providers, child: const MainApp()));
+  runApp(const MainApp());
 }
 
 class MainApp extends StatelessWidget {

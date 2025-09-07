@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../models/chat.dart';
 import '../models/message.dart';
 import '../repositories/chat_repository.dart';
 import '../repositories/message_repository.dart';
+import '../models/extension_request.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 
@@ -10,6 +12,7 @@ class ChatListViewModel extends ChangeNotifier {
   final ChatRepository _chatRepository = ChatRepository();
   final MessageRepository _messageRepository = MessageRepository();
   final UserService _userService = UserService();
+  ChatService? _chatService;
 
   bool _isLoading = false;
   String? _currentUserId;
@@ -17,6 +20,11 @@ class ChatListViewModel extends ChangeNotifier {
   List<Chat> _activeChats = [];
   List<Chat> _expiredChats = [];
   Map<String, Message?> _lastMessages = {};
+  List<ExtensionRequest> _incomingRequests = [];
+  List<ExtensionRequest> _myPendingRequests = [];
+  Set<String> _myPendingIds = {};
+  StreamSubscription? _extensionSubscription;
+  StreamSubscription? _myExtensionSubscription;
 
   bool get isLoading => _isLoading;
   String? get currentUserId => _currentUserId;
@@ -25,6 +33,8 @@ class ChatListViewModel extends ChangeNotifier {
   List<Chat> get expiredChats => _expiredChats;
   bool get hasChats => _activeChats.isNotEmpty || _expiredChats.isNotEmpty;
   Message? getLastMessage(String chatId) => _lastMessages[chatId];
+  List<ExtensionRequest> get incomingRequests => _incomingRequests;
+  List<ExtensionRequest> get myPendingRequests => _myPendingRequests;
 
   ChatListViewModel() {
     _initialize();
@@ -60,7 +70,16 @@ class ChatListViewModel extends ChangeNotifier {
     try {
       final currentUser = await _userService.getCurrentUser();
       _currentUserId = currentUser.id;
+      // Ensure ChatService available for extension requests
+      _chatService = ChatService.instance;
+      if (_chatService == null || _chatService!.userId != _currentUserId!) {
+        _chatService = ChatService(userId: _currentUserId!);
+        // No need to await initialize for local operations; but safe to initialize once
+        await _chatService!.initialize();
+      }
       await _loadChatsAndMessages();
+      _setupExtensionListener();
+      _setupMyExtensionListener();
       _clearError();
     } catch (e) {
       _setError('Failed to load chats: $e');
@@ -108,6 +127,96 @@ class ChatListViewModel extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _setError('Failed to delete chat: $e');
+    }
+  }
+
+  void _setupExtensionListener() {
+    if (_chatService == null) return;
+    _extensionSubscription?.cancel();
+    _extensionSubscription = _chatService!.getExtensionRequests().listen((
+      list,
+    ) async {
+      // Convert maps to ExtensionRequest models
+      final requests = <ExtensionRequest>[];
+      for (final item in list) {
+        final chatId = item['chatId'] as String;
+        final map = Map<String, dynamic>.from(item);
+        map.remove('chatId');
+        final req = ExtensionRequest.fromJson(chatId, map);
+        if (req.isPending && !req.isExpired) {
+          requests.add(req);
+        }
+      }
+      _incomingRequests = requests;
+      notifyListeners();
+    }, onError: (_) {});
+  }
+
+  void _setupMyExtensionListener() {
+    if (_chatService == null) return;
+    _myExtensionSubscription?.cancel();
+    _myExtensionSubscription = _chatService!.getMyExtensionRequests().listen((
+      list,
+    ) async {
+      final requests = <ExtensionRequest>[];
+      for (final item in list) {
+        final chatId = item['chatId'] as String;
+        final map = Map<String, dynamic>.from(item);
+        map.remove('chatId');
+        final req = ExtensionRequest.fromJson(chatId, map);
+        if (req.isPending && !req.isExpired) {
+          requests.add(req);
+        }
+      }
+      final newIds = requests.map((r) => r.chatId).toSet();
+      // Detect which requests were removed (approved or rejected by the other user)
+      final removed = _myPendingIds.difference(newIds);
+      final changed =
+          newIds.length != _myPendingIds.length ||
+          !_myPendingIds.containsAll(newIds) ||
+          !newIds.containsAll(_myPendingIds);
+      _myPendingRequests = requests;
+      _myPendingIds = newIds;
+      notifyListeners();
+      // If a pending request was approved/rejected, refresh chats to reflect state
+      if (changed) {
+        // Pull latest chat state from Firebase for affected chats first
+        if (_chatService != null) {
+          for (final id in removed) {
+            try {
+              await _chatService!.syncChatFromFirebase(id);
+            } catch (_) {}
+          }
+        }
+        await _loadChatsAndMessages();
+      }
+    }, onError: (_) {});
+  }
+
+  Future<bool> approveExtension(String chatId) async {
+    if (_chatService == null) return false;
+    try {
+      final ok = await _chatService!.respondToExtensionRequest(chatId, true);
+      if (ok) {
+        await _loadChatsAndMessages();
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> rejectExtension(String chatId) async {
+    if (_chatService == null) return false;
+    try {
+      final ok = await _chatService!.respondToExtensionRequest(chatId, false);
+      if (ok) {
+        // No change to chat data; still refresh extension list
+        await _loadChatsAndMessages();
+      }
+      return ok;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -173,5 +282,12 @@ class ChatListViewModel extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _extensionSubscription?.cancel();
+    _myExtensionSubscription?.cancel();
+    super.dispose();
   }
 }
